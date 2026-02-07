@@ -54,8 +54,8 @@ struct TaskRow: View {
                 } else {
                     Text(task.title)
                         .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(task.isDone ? Theme.textPrimary.opacity(0.5) : textPrimaryColor)
-                        .strikethrough(task.isDone, color: Theme.textPrimary.opacity(0.5))
+                        .foregroundStyle(task.isDone ? completedTextColor : textPrimaryColor)
+                        .strikethrough(task.isDone, color: completedTextColor)
                         .lineLimit(1)
                         .onTapGesture(count: 2) {
                             startEdit()
@@ -116,6 +116,10 @@ struct TaskRow: View {
 
     private var trashColor: Color {
         colorScheme == .dark ? .white : Theme.textSecondary
+    }
+
+    private var completedTextColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5)
     }
 
     private func startEdit() {

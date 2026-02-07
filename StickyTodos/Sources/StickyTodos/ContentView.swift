@@ -67,7 +67,7 @@ struct ContentView: View {
             if store.tasks.isEmpty == false {
                 Text(taskCountLabel)
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Theme.textPrimary.opacity(0.5))
+                    .foregroundStyle(isDark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.easeInOut(duration: 0.2), value: store.tasks.count)
