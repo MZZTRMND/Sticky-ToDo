@@ -6,6 +6,7 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isAddHovered = false
     @State private var isInputHovered = false
+    @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
 
@@ -65,13 +66,21 @@ struct ContentView: View {
             Spacer()
 
             if store.tasks.isEmpty == false {
-                Text(taskCountLabel)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(isDark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.2), value: store.tasks.count)
-                    .padding(.top, -25)
+                Button(action: clearCompleted) {
+                    Text(counterLabel)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(counterColor)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.2), value: store.tasks.count)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, -25)
+                .onHover { hovering in
+                    isCounterHovered = hovering
+                }
+                .disabled(completedCount == 0)
+                .help(completedCount > 0 ? "Clear completed" : "Task count")
             }
         }
         .frame(height: Layout.headerHeight, alignment: .top)
@@ -218,6 +227,31 @@ private extension ContentView {
     var taskCountLabel: String {
         let count = store.tasks.count
         return "\(count) task" + (count == 1 ? "" : "s")
+    }
+
+    var completedCount: Int {
+        store.tasks.filter { $0.isDone }.count
+    }
+
+    var counterLabel: String {
+        if isCounterHovered && completedCount > 0 {
+            return "Clear completed"
+        }
+        return taskCountLabel
+    }
+
+    var counterColor: Color {
+        if isCounterHovered {
+            return completedCount == 0
+                ? (isDark ? Color.white.opacity(0.35) : Theme.textPrimary.opacity(0.35))
+                : (isDark ? Color.white.opacity(0.8) : Theme.textPrimary.opacity(0.8))
+        }
+        return isDark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5)
+    }
+
+    func clearCompleted() {
+        guard completedCount > 0 else { return }
+        store.clearCompleted()
     }
 }
 

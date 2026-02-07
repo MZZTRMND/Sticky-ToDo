@@ -31,6 +31,10 @@ final class TaskStore: ObservableObject {
         tasks[index].title = trimmed
     }
 
+    func clearCompleted() {
+        tasks.removeAll { $0.isDone }
+    }
+
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
         do {
