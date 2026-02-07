@@ -28,7 +28,8 @@ struct ContentView: View {
             .padding(.horizontal, Layout.cardPadding)
         }
         .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
-        .frame(width: Layout.cardWidth, height: windowHeight)
+        .frame(minWidth: Layout.cardWidth, maxWidth: 600)
+        .frame(height: windowHeight)
         .onAppear {
             isInputFocused = true
         }

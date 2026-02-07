@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         // Removed autosave to prevent snap-back on focus.
-        window.styleMask = [.borderless, .fullSizeContentView]
+        window.styleMask = [.borderless, .fullSizeContentView, .resizable]
         window.styleMask.remove(.miniaturizable)
         window.styleMask.remove(.closable)
     }
