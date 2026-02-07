@@ -1,0 +1,16 @@
+.DS_Store
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+DerivedData/
+.build/
+
+# App bundles
+*.app/
+
+# SwiftPM
+Package.resolved
+
+# Xcode playgrounds
+timeline.xctimeline
+playground.xcworkspace
