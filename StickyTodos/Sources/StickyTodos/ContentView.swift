@@ -40,6 +40,11 @@ struct ContentView: View {
                 NSApp.activate(ignoringOtherApps: true)
             }
         )
+        .contextMenu {
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
+            }
+        }
     }
 
     private func header(dayNumber: Int, date: Date) -> some View {
@@ -228,6 +233,7 @@ private extension ContentView {
         let count = store.tasks.count
         return "\(count) task" + (count == 1 ? "" : "s")
     }
+
 
     var completedCount: Int {
         store.tasks.filter { $0.isDone }.count
