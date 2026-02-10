@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
     @State private var isListHovered = false
+    @State private var windowRef: NSWindow?
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -40,11 +41,15 @@ struct ContentView: View {
         }
         .background(
             WindowAccessor { window in
+                windowRef = window
                 window.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
                 window.isMovableByWindowBackground = !isListHovered
             }
         )
+        .onTapGesture {
+            activateWindow()
+        }
     }
 
     private func header(dayNumber: Int, date: Date) -> some View {
@@ -146,6 +151,11 @@ struct ContentView: View {
         .onHover { hovering in
             isInputHovered = hovering
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activateWindow()
+            isInputFocused = true
+        }
         .modifier(ShakeEffect(animatableData: shakeTrigger))
     }
 
@@ -188,6 +198,8 @@ struct ContentView: View {
         .contextMenu {
             Button("Add divider") {
                 store.addDivider()
+                activateWindow()
+                isInputFocused = true
             }
         }
         .onHover { hovering in
@@ -206,6 +218,13 @@ struct ContentView: View {
         store.addTask(title: trimmed)
         newTaskText = ""
         isInputFocused = true
+        activateWindow()
+    }
+
+    private func activateWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        windowRef?.makeKeyAndOrderFront(nil)
+        windowRef?.makeKey()
     }
 }
 

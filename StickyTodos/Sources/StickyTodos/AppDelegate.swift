@@ -1,42 +1,51 @@
 import AppKit
+import SwiftUI
+
+final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private let autosaveDelay: TimeInterval = 0.1
+    private var window: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        configureWindowsSoon()
         configureStatusItem()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidBecomeMain(_:)),
-            name: NSWindow.didBecomeMainNotification,
-            object: nil
+        createWindow()
+    }
+
+    private func createWindow() {
+        let rootView = ContentView()
+        let hostingView = NSHostingView(rootView: rootView)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+
+        let panel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
+            styleMask: [.borderless, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
         )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.contentView = hostingView
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window = panel
     }
 
-    @objc private func windowDidBecomeMain(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        configureWindow(window)
-    }
-
-    private func configureWindowsSoon() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + autosaveDelay) {
-            for window in NSApplication.shared.windows {
-                self.configureWindow(window)
-            }
-        }
-    }
-
-    private func configureWindow(_ window: NSWindow) {
-        applyWindowAppearance(window)
-        applyWindowBehavior(window)
-        applyWindowChrome(window)
-        window.makeKeyAndOrderFront(nil)
-        window.makeKey()
-    }
 
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -52,33 +61,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
-    }
-
-    // MARK: - Window Configuration
-
-    private func applyWindowAppearance(_ window: NSWindow) {
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = true
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.contentView?.wantsLayer = true
-        window.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
-    }
-
-    private func applyWindowBehavior(_ window: NSWindow) {
-        window.isMovableByWindowBackground = true
-        window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        // Removed autosave to prevent snap-back on focus.
-        window.styleMask = [.borderless, .fullSizeContentView, .resizable]
-        window.styleMask.remove(.miniaturizable)
-        window.styleMask.remove(.closable)
-    }
-
-    private func applyWindowChrome(_ window: NSWindow) {
-        window.standardWindowButton(.closeButton)?.isHidden = true
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        window.standardWindowButton(.zoomButton)?.isHidden = true
     }
 }

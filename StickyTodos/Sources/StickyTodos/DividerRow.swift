@@ -64,6 +64,7 @@ struct DividerRow: View {
         isEditing = true
         DispatchQueue.main.async {
             isEditingFocused = true
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
