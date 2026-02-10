@@ -5,13 +5,22 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var title: String
     var isDone: Bool
     var isDivider: Bool
+    var imageFilename: String?
     let createdAt: Date
 
-    init(id: UUID = UUID(), title: String, isDone: Bool = false, isDivider: Bool = false, createdAt: Date = Date()) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        isDone: Bool = false,
+        isDivider: Bool = false,
+        imageFilename: String? = nil,
+        createdAt: Date = Date()
+    ) {
         self.id = id
         self.title = title
         self.isDone = isDone
         self.isDivider = isDivider
+        self.imageFilename = imageFilename
         self.createdAt = createdAt
     }
 
@@ -20,6 +29,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         case title
         case isDone
         case isDivider
+        case imageFilename
         case createdAt
     }
 
@@ -29,6 +39,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         title = try container.decode(String.self, forKey: .title)
         isDone = try container.decodeIfPresent(Bool.self, forKey: .isDone) ?? false
         isDivider = try container.decodeIfPresent(Bool.self, forKey: .isDivider) ?? false
+        imageFilename = try container.decodeIfPresent(String.self, forKey: .imageFilename)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 
@@ -38,6 +49,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         try container.encode(title, forKey: .title)
         try container.encode(isDone, forKey: .isDone)
         try container.encode(isDivider, forKey: .isDivider)
+        try container.encodeIfPresent(imageFilename, forKey: .imageFilename)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }

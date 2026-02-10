@@ -3,6 +3,7 @@ import SwiftUI
 struct DividerRow: View {
     let title: String
     let onRename: (String) -> Void
+    @Binding var editTrigger: Bool
 
     @State private var isEditing = false
     @State private var draftTitle = ""
@@ -11,7 +12,6 @@ struct DividerRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            line
             if isEditing {
                 TextField("", text: $draftTitle)
                     .textFieldStyle(.plain)
@@ -40,12 +40,27 @@ struct DividerRow: View {
             line
         }
         .padding(.vertical, 8)
+        .padding(.leading, 8)
         .contentShape(Rectangle())
+        .onChange(of: editTrigger) { shouldEdit in
+            guard shouldEdit else { return }
+            startEdit()
+            editTrigger = false
+        }
     }
 
     private var line: some View {
         Rectangle()
-            .fill(textColor.opacity(0.25))
+            .fill(
+                LinearGradient(
+                    colors: [
+                        textColor.opacity(0.25),
+                        textColor.opacity(0.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .frame(height: 1)
     }
 
