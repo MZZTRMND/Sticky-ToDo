@@ -85,12 +85,19 @@ struct ContentView: View {
 
                 if store.taskCount > 0 {
                     Button(action: clearCompleted) {
-                        Text(counterLabel)
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(counterColor)
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.2), value: store.taskCount)
+                        HStack(spacing: 2) {
+                            if completedCount > 0 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.green)
+                            }
+                            Text(counterLabel)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(counterColor)
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                                .animation(.easeInOut(duration: 0.2), value: store.taskCount)
+                        }
                     }
                     .buttonStyle(.plain)
                     .padding(.top, -25)
@@ -98,7 +105,7 @@ struct ContentView: View {
                         isCounterHovered = hovering
                     }
                     .disabled(completedCount == 0)
-                    .help(completedCount > 0 ? "Clear completed" : "Task count")
+                    .help(completedCount > 0 ? "Clear \(completedCount)" : "Task count")
                 }
             }
             .frame(height: Layout.headerHeight, alignment: .top)
@@ -136,7 +143,7 @@ struct ContentView: View {
 
                 if let draftImage = draftImageView {
                     draftImage
-                        .padding(.trailing, 4)
+                        .padding(.trailing, 2)
                 }
 
                 Button(action: addTask) {
@@ -172,7 +179,7 @@ struct ContentView: View {
             return handleImageProviders(providers)
         }
         .onPasteCommand(of: [.image]) { providers in
-            handleImageProviders(providers)
+            _ = handleImageProviders(providers)
         }
         .modifier(ShakeEffect(animatableData: shakeTrigger))
     }
@@ -211,6 +218,11 @@ struct ContentView: View {
                             onToggle: { store.toggleDone(for: task) },
                             onDelete: { store.delete(task) },
                             onRename: { store.updateTitle(for: task, title: $0) },
+                            onPasteImage: { image in
+                                if let filename = ImageStore.saveImage(image) {
+                                    store.updateImage(for: task, filename: filename)
+                                }
+                            },
                             editTrigger: Binding(
                                 get: { editingTaskId == task.id },
                                 set: { isEditing in
@@ -304,14 +316,9 @@ struct ContentView: View {
                 store.delete(task)
             }
         } else {
-            Button("Edit name") {
+            Button("Edit task") {
                 editingTaskId = task.id
                 activateWindow()
-            }
-            Button("Add divider") {
-                store.addDivider(above: task)
-                activateWindow()
-                isInputFocused = true
             }
             Button(task.imageFilename == nil ? "Add image…" : "Replace image…") {
                 pickImageForTask(task)
@@ -321,12 +328,20 @@ struct ContentView: View {
                     store.updateImage(for: task, filename: nil)
                 }
             }
+            if task.isImportant {
+                Button("Unmark as important") {
+                    store.setImportant(false, for: task)
+                }
+            } else {
+                Button("Mark as important") {
+                    store.setImportant(true, for: task)
+                }
+            }
         }
     }
 
     private var draftImageView: AnyView? {
         guard let filename = newTaskImageFilename else { return nil }
-        let url = ImageStore.url(for: filename)
         guard let nsImage = ImageStore.thumbnail(named: filename, size: 40) else { return nil }
         return AnyView(
             ZStack {
@@ -334,9 +349,9 @@ struct ContentView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
 
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 100, style: .continuous)
                     .fill(Color.black.opacity(isDraftImageHovered ? 0.2 : 0))
                     .frame(width: 40, height: 40)
 
@@ -493,9 +508,9 @@ private extension ContentView {
 
     var counterLabel: String {
         if isCounterHovered && completedCount > 0 {
-            return "Clear completed"
+            return "Clear \(completedCount)"
         }
-        return taskCountLabel
+        return "\(completedCount) of \(store.taskCount) tasks"
     }
 
     var counterColor: Color {

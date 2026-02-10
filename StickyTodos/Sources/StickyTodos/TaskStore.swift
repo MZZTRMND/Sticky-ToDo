@@ -56,6 +56,11 @@ final class TaskStore: ObservableObject {
         tasks[index].imageFilename = filename
     }
 
+    func setImportant(_ isImportant: Bool, for task: TaskItem) {
+        guard let index = indexOfTask(task) else { return }
+        tasks[index].isImportant = isImportant
+    }
+
     func moveTask(from sourceId: UUID, to targetId: UUID) {
         guard sourceId != targetId else { return }
         guard let sourceIndex = tasks.firstIndex(where: { $0.id == sourceId }) else { return }
