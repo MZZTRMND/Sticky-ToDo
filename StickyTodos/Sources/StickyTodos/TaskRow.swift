@@ -115,7 +115,7 @@ struct TaskRow: View {
     }
 
     private var trashColor: Color {
-        colorScheme == .dark ? .white : Theme.textSecondary
+        colorScheme == .dark ? .white : Theme.textPrimary.opacity(0.5)
     }
 
     private var completedTextColor: Color {

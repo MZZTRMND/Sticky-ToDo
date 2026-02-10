@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+// Borderless panel that can still become key to keep text input focused.
 final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -17,8 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createWindow() {
-        let rootView = ContentView()
-        let hostingView = NSHostingView(rootView: rootView)
+        let hostingView = NSHostingView(rootView: ContentView())
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
 
@@ -28,9 +28,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
+        configurePanel(panel, hostingView: hostingView)
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        window = panel
+    }
+
+    private func configurePanel(_ panel: NSPanel, hostingView: NSView) {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
+        panel.hidesOnDeactivate = false
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.titleVisibility = .hidden
@@ -40,10 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.contentView = hostingView
-        panel.center()
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        window = panel
     }
 
 

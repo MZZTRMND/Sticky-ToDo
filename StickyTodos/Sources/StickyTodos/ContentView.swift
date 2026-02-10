@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var store = TaskStore()
@@ -42,13 +41,15 @@ struct ContentView: View {
         .background(
             WindowAccessor { window in
                 windowRef = window
-                window.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-                window.isMovableByWindowBackground = !isListHovered
+                bringWindowToFront()
+                updateWindowDragBehavior()
             }
         )
         .onTapGesture {
             activateWindow()
+        }
+        .onChange(of: isListHovered) { _ in
+            updateWindowDragBehavior()
         }
     }
 
@@ -161,13 +162,12 @@ struct ContentView: View {
 
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: Layout.listRowSpacing) {
-                ForEach(store.tasks) { task in
+            LazyVStack(spacing: 0) {
+                ForEach(Array(store.tasks.enumerated()), id: \.element.id) { index, task in
                     if task.isDivider {
                         DividerRow(
                             title: task.title,
-                            onRename: { store.updateTitle(for: task, title: $0) },
-                            onDelete: { store.delete(task) }
+                            onRename: { store.updateTitle(for: task, title: $0) }
                         )
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
@@ -175,6 +175,9 @@ struct ContentView: View {
                             return NSItemProvider(object: task.id.uuidString as NSString)
                         }
                         .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+                        .contextMenu {
+                            rowContextMenu(for: task)
+                        }
                     } else {
                         TaskRow(
                             task: task,
@@ -188,6 +191,22 @@ struct ContentView: View {
                             return NSItemProvider(object: task.id.uuidString as NSString)
                         }
                         .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+                        .contextMenu {
+                            rowContextMenu(for: task)
+                        }
+                    }
+
+                    if index < store.tasks.count - 1 {
+                        Color.clear
+                            .frame(height: Layout.listRowSpacing)
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                Button("Add divider") {
+                                    store.addDivider(at: index + 1)
+                                    activateWindow()
+                                    isInputFocused = true
+                                }
+                            }
                     }
                 }
             }
@@ -195,13 +214,6 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
         .frame(maxHeight: Layout.listMaxHeight)
-        .contextMenu {
-            Button("Add divider") {
-                store.addDivider()
-                activateWindow()
-                isInputFocused = true
-            }
-        }
         .onHover { hovering in
             isListHovered = hovering
         }
@@ -225,6 +237,30 @@ struct ContentView: View {
         NSApp.activate(ignoringOtherApps: true)
         windowRef?.makeKeyAndOrderFront(nil)
         windowRef?.makeKey()
+    }
+
+    private func bringWindowToFront() {
+        windowRef?.makeKeyAndOrderFront(nil)
+        windowRef?.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func updateWindowDragBehavior() {
+        windowRef?.isMovableByWindowBackground = !isListHovered
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(for task: TaskItem) -> some View {
+        Button("Add divider") {
+            store.addDivider(above: task)
+            activateWindow()
+            isInputFocused = true
+        }
+        if task.isDivider {
+            Button("Delete divider") {
+                store.delete(task)
+            }
+        }
     }
 }
 
@@ -282,6 +318,7 @@ private extension ContentView {
         return store.tasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
 
+
     var taskCountLabel: String {
         let count = store.taskCount
         return "\(count) task" + (count == 1 ? "" : "s")
@@ -312,6 +349,7 @@ private extension ContentView {
         guard completedCount > 0 else { return }
         store.clearCompleted()
     }
+
 }
 
 private enum Layout {

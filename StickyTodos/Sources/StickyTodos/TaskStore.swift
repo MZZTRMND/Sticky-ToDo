@@ -20,6 +20,16 @@ final class TaskStore: ObservableObject {
         tasks.insert(TaskItem(title: title, isDivider: true), at: 0)
     }
 
+    func addDivider(above task: TaskItem, title: String = "New section") {
+        guard let index = indexOfTask(task) else { return }
+        tasks.insert(TaskItem(title: title, isDivider: true), at: index)
+    }
+
+    func addDivider(at index: Int, title: String = "New section") {
+        let safeIndex = max(0, min(index, tasks.count))
+        tasks.insert(TaskItem(title: title, isDivider: true), at: safeIndex)
+    }
+
     func toggleDone(for task: TaskItem) {
         guard let index = indexOfTask(task) else { return }
         tasks[index].isDone.toggle()

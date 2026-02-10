@@ -3,7 +3,6 @@ import SwiftUI
 struct DividerRow: View {
     let title: String
     let onRename: (String) -> Void
-    let onDelete: () -> Void
 
     @State private var isEditing = false
     @State private var draftTitle = ""
@@ -16,10 +15,10 @@ struct DividerRow: View {
             if isEditing {
                 TextField("", text: $draftTitle)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(textColor)
                     .multilineTextAlignment(.center)
-                    .frame(minWidth: 100)
+                    .fixedSize(horizontal: true, vertical: false)
                     .focused($isEditingFocused)
                     .onSubmit(commitEdit)
                     .onExitCommand { cancelEdit() }
@@ -30,10 +29,10 @@ struct DividerRow: View {
                     }
             } else {
                 Text(title)
-                    .font(.system(size: 16, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(textColor)
                     .multilineTextAlignment(.center)
-                    .frame(minWidth: 100)
+                    .fixedSize(horizontal: true, vertical: false)
                     .onTapGesture(count: 2) {
                         startEdit()
                     }
@@ -42,11 +41,6 @@ struct DividerRow: View {
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .contextMenu {
-            Button("Delete divider") {
-                onDelete()
-            }
-        }
     }
 
     private var line: some View {
