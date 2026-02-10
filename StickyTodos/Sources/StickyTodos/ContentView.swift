@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var store = TaskStore()
@@ -8,6 +9,8 @@ struct ContentView: View {
     @State private var isInputHovered = false
     @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
+    @State private var draggingId: UUID?
+    @State private var isListHovered = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -27,6 +30,7 @@ struct ContentView: View {
             }
             .padding(.top, Layout.cardPadding)
             .padding(.horizontal, Layout.cardPadding)
+
         }
         .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
         .frame(minWidth: Layout.cardWidth, maxWidth: 600)
@@ -38,58 +42,62 @@ struct ContentView: View {
             WindowAccessor { window in
                 window.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
+                window.isMovableByWindowBackground = !isListHovered
             }
         )
+    }
+
+    private func header(dayNumber: Int, date: Date) -> some View {
+        return ZStack {
+            WindowDragView()
+            HStack {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top, spacing: Layout.headerInnerSpacing) {
+                        Text("\(dayNumber)")
+                            .font(.system(size: Layout.dayFontSize, weight: .bold))
+                            .foregroundStyle(primaryTextColor)
+                            .frame(minWidth: Layout.dayFrameWidth, minHeight: Layout.headerHeight, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(date, format: .dateTime.month(.wide))
+                                .font(.system(size: Layout.monthFontSize, weight: .bold))
+                                .foregroundStyle(primaryTextColor)
+                                .frame(height: Layout.headerLineHeight, alignment: .topLeading)
+                            Text(date, format: .dateTime.weekday(.wide))
+                                .font(.system(size: Layout.weekdayFontSize, weight: .regular))
+                                .foregroundStyle(primaryTextColor)
+                                .frame(height: Layout.headerLineHeight, alignment: .topLeading)
+                        }
+                    }
+                }
+                Spacer()
+
+                if store.taskCount > 0 {
+                    Button(action: clearCompleted) {
+                        Text(counterLabel)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(counterColor)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.2), value: store.taskCount)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, -25)
+                    .onHover { hovering in
+                        isCounterHovered = hovering
+                    }
+                    .disabled(completedCount == 0)
+                    .help(completedCount > 0 ? "Clear completed" : "Task count")
+                }
+            }
+            .frame(height: Layout.headerHeight, alignment: .top)
+            .padding(.trailing, Layout.headerTrailingPadding)
+        }
+        .frame(height: Layout.headerHeight, alignment: .top)
         .contextMenu {
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    private func header(dayNumber: Int, date: Date) -> some View {
-        return HStack {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: Layout.headerInnerSpacing) {
-                    Text("\(dayNumber)")
-                        .font(.system(size: Layout.dayFontSize, weight: .bold))
-                        .foregroundStyle(primaryTextColor)
-                        .frame(width: Layout.dayFrameWidth, height: Layout.headerHeight)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(date, format: .dateTime.month(.wide))
-                            .font(.system(size: Layout.monthFontSize, weight: .bold))
-                            .foregroundStyle(primaryTextColor)
-                            .frame(height: Layout.headerLineHeight, alignment: .topLeading)
-                        Text(date, format: .dateTime.weekday(.wide))
-                            .font(.system(size: Layout.weekdayFontSize, weight: .regular))
-                            .foregroundStyle(primaryTextColor)
-                            .frame(height: Layout.headerLineHeight, alignment: .topLeading)
-                    }
-                }
-            }
-
-            Spacer()
-
-            if store.tasks.isEmpty == false {
-                Button(action: clearCompleted) {
-                    Text(counterLabel)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(counterColor)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .animation(.easeInOut(duration: 0.2), value: store.tasks.count)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, -25)
-                .onHover { hovering in
-                    isCounterHovered = hovering
-                }
-                .disabled(completedCount == 0)
-                .help(completedCount > 0 ? "Clear completed" : "Task count")
-            }
-        }
-        .frame(height: Layout.headerHeight, alignment: .top)
-        .padding(.trailing, Layout.headerTrailingPadding)
     }
 
     private var inputRow: some View {
@@ -145,20 +153,46 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: Layout.listRowSpacing) {
                 ForEach(store.tasks) { task in
-                    TaskRow(
-                        task: task,
-                        onToggle: { store.toggleDone(for: task) },
-                        onDelete: {
-                            store.delete(task)
-                        },
-                        onRename: { store.updateTitle(for: task, title: $0) }
-                    )
+                    if task.isDivider {
+                        DividerRow(
+                            title: task.title,
+                            onRename: { store.updateTitle(for: task, title: $0) },
+                            onDelete: { store.delete(task) }
+                        )
+                        .opacity(draggingId == task.id ? 0.4 : 1.0)
+                        .onDrag {
+                            draggingId = task.id
+                            return NSItemProvider(object: task.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+                    } else {
+                        TaskRow(
+                            task: task,
+                            onToggle: { store.toggleDone(for: task) },
+                            onDelete: { store.delete(task) },
+                            onRename: { store.updateTitle(for: task, title: $0) }
+                        )
+                        .opacity(draggingId == task.id ? 0.4 : 1.0)
+                        .onDrag {
+                            draggingId = task.id
+                            return NSItemProvider(object: task.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+                    }
                 }
             }
             .padding(.top, Layout.listTopPadding)
         }
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
         .frame(maxHeight: Layout.listMaxHeight)
+        .contextMenu {
+            Button("Add divider") {
+                store.addDivider()
+            }
+        }
+        .onHover { hovering in
+            isListHovered = hovering
+        }
     }
 
     private func addTask() {
@@ -230,7 +264,7 @@ private extension ContentView {
     }
 
     var taskCountLabel: String {
-        let count = store.tasks.count
+        let count = store.taskCount
         return "\(count) task" + (count == 1 ? "" : "s")
     }
 

@@ -16,6 +16,10 @@ final class TaskStore: ObservableObject {
         tasks.insert(TaskItem(title: trimmed), at: 0)
     }
 
+    func addDivider(title: String = "New section") {
+        tasks.insert(TaskItem(title: title, isDivider: true), at: 0)
+    }
+
     func toggleDone(for task: TaskItem) {
         guard let index = indexOfTask(task) else { return }
         tasks[index].isDone.toggle()
@@ -29,6 +33,19 @@ final class TaskStore: ObservableObject {
         guard let trimmed = normalizedTitle(from: title) else { return }
         guard let index = indexOfTask(task) else { return }
         tasks[index].title = trimmed
+    }
+
+    func moveTask(from sourceId: UUID, to targetId: UUID) {
+        guard sourceId != targetId else { return }
+        guard let sourceIndex = tasks.firstIndex(where: { $0.id == sourceId }) else { return }
+        guard let targetIndex = tasks.firstIndex(where: { $0.id == targetId }) else { return }
+        let item = tasks.remove(at: sourceIndex)
+        let adjustedIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex
+        tasks.insert(item, at: adjustedIndex)
+    }
+
+    var taskCount: Int {
+        tasks.filter { $0.isDivider == false }.count
     }
 
     func clearCompleted() {
