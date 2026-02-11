@@ -1,26 +1,21 @@
 import SwiftUI
-import AppKit
-import UniformTypeIdentifiers
 
 struct TaskRow: View {
     let task: TaskItem
     let onToggle: () -> Void
     let onDelete: () -> Void
     let onRename: (String) -> Void
-    let onPasteImage: (NSImage) -> Void
     @Binding var editTrigger: Bool
     @State private var isCircleHovered = false
     @State private var isTrashHovered = false
     @State private var isRowHovered = false
     @State private var isEditing = false
     @State private var draftTitle = ""
-    @State private var isTaskImageHovered = false
-    @State private var cachedThumbnail: NSImage?
     @FocusState private var isEditingFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(alignment: hasImage ? .firstTextBaseline : .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             Circle()
                 .fill(task.isDone ? (colorScheme == .dark ? .white : Theme.doneGreen) : .clear)
                 .overlay(
@@ -57,32 +52,6 @@ struct TaskRow: View {
                                 commitEdit()
                             }
                         }
-                        .onPasteCommand(of: [.image]) { _ in
-                            if let image = NSImage(pasteboard: NSPasteboard.general) {
-                                onPasteImage(image)
-                            }
-                        }
-                        .onDrop(of: [UTType.image, UTType.fileURL], isTargeted: nil) { providers in
-                            for provider in providers {
-                                if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                                        guard let data = item as? Data,
-                                              let url = URL(dataRepresentation: data, relativeTo: nil),
-                                              let image = NSImage(contentsOf: url) else { return }
-                                        onPasteImage(image)
-                                    }
-                                    return true
-                                }
-                                if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                                    provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
-                                        guard let data, let image = NSImage(data: data) else { return }
-                                        onPasteImage(image)
-                                    }
-                                    return true
-                                }
-                            }
-                            return false
-                        }
                 } else {
                     Text(task.title)
                         .font(.system(size: 16, weight: .regular))
@@ -92,10 +61,6 @@ struct TaskRow: View {
                         .onTapGesture(count: 2) {
                             startEdit()
                         }
-                }
-
-                if let image = taskImage {
-                    image
                 }
             }
             .contentShape(Rectangle())
@@ -126,7 +91,7 @@ struct TaskRow: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: hasImage ? 25 : 100, style: .continuous)
+            RoundedRectangle(cornerRadius: 100, style: .continuous)
                 .fill(isRowHovered ? rowHoverColor : .clear)
         )
         .onHover { hovering in
@@ -166,48 +131,6 @@ struct TaskRow: View {
 
     private var completedTextColor: Color {
         colorScheme == .dark ? Color.white.opacity(0.25) : Theme.textPrimary.opacity(0.4)
-    }
-
-    private var hasImage: Bool {
-        task.imageFilename != nil
-    }
-
-    private var taskImage: AnyView? {
-        guard let filename = task.imageFilename else { return nil }
-        let url = ImageStore.url(for: filename)
-        guard let nsImage = cachedThumbnail ?? ImageStore.thumbnail(named: filename, size: 80) else { return nil }
-        return AnyView(
-            ZStack {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 80, height: 80)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.black.opacity(isTaskImageHovered ? 0.2 : 0))
-                    .frame(width: 80, height: 80)
-
-                Image(systemName: "eye")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.white)
-                    .opacity(isTaskImageHovered ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isTaskImageHovered = hovering
-            }
-            .animation(.easeInOut(duration: 0.18), value: isTaskImageHovered)
-            .onTapGesture {
-                NSWorkspace.shared.open(url)
-            }
-            .onAppear {
-                cachedThumbnail = ImageStore.thumbnail(named: filename, size: 80)
-            }
-            .onDisappear {
-                cachedThumbnail = nil
-            }
-        )
     }
 
     private func startEdit() {

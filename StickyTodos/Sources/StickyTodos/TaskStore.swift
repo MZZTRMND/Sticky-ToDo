@@ -11,9 +11,9 @@ final class TaskStore: ObservableObject {
         load()
     }
 
-    func addTask(title: String, imageFilename: String? = nil) {
+    func addTask(title: String) {
         guard let trimmed = normalizedTitle(from: title) else { return }
-        tasks.insert(TaskItem(title: trimmed, imageFilename: imageFilename), at: 0)
+        tasks.insert(TaskItem(title: trimmed), at: 0)
     }
 
     func addDivider(title: String = "New section") {
@@ -36,9 +36,6 @@ final class TaskStore: ObservableObject {
     }
 
     func delete(_ task: TaskItem) {
-        if let filename = task.imageFilename {
-            ImageStore.deleteImage(named: filename)
-        }
         tasks.removeAll { $0.id == task.id }
     }
 
@@ -46,14 +43,6 @@ final class TaskStore: ObservableObject {
         guard let trimmed = normalizedTitle(from: title) else { return }
         guard let index = indexOfTask(task) else { return }
         tasks[index].title = trimmed
-    }
-
-    func updateImage(for task: TaskItem, filename: String?) {
-        guard let index = indexOfTask(task) else { return }
-        if let existing = tasks[index].imageFilename, existing != filename {
-            ImageStore.deleteImage(named: existing)
-        }
-        tasks[index].imageFilename = filename
     }
 
     func setImportant(_ isImportant: Bool, for task: TaskItem) {
@@ -75,12 +64,6 @@ final class TaskStore: ObservableObject {
     }
 
     func clearCompleted() {
-        let completed = tasks.filter { $0.isDone }
-        for task in completed {
-            if let filename = task.imageFilename {
-                ImageStore.deleteImage(named: filename)
-            }
-        }
         tasks.removeAll { $0.isDone }
     }
 

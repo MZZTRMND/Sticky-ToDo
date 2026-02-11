@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var store = TaskStore()
@@ -15,8 +14,6 @@ struct ContentView: View {
     @State private var windowRef: NSWindow?
     @State private var editingDividerId: UUID?
     @State private var editingTaskId: UUID?
-    @State private var newTaskImageFilename: String?
-    @State private var isDraftImageHovered = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -134,11 +131,6 @@ struct ContentView: View {
 
                 Spacer()
 
-                if let draftImage = draftImageView {
-                    draftImage
-                        .padding(.trailing, 2)
-                }
-
                 Button(action: addTask) {
                     Image(systemName: "plus")
                         .font(.system(size: Layout.addIconSize, weight: .medium))
@@ -167,12 +159,6 @@ struct ContentView: View {
         .onTapGesture {
             activateWindow()
             isInputFocused = true
-        }
-        .onDrop(of: [UTType.image, UTType.fileURL], isTargeted: nil) { providers in
-            handleImageProviders(providers)
-        }
-        .onPasteCommand(of: [.image]) { providers in
-            _ = handleImageProviders(providers)
         }
         .modifier(ShakeEffect(animatableData: shakeTrigger))
     }
@@ -211,11 +197,6 @@ struct ContentView: View {
                             onToggle: { store.toggleDone(for: task) },
                             onDelete: { store.delete(task) },
                             onRename: { store.updateTitle(for: task, title: $0) },
-                            onPasteImage: { image in
-                                if let filename = ImageStore.saveImage(image) {
-                                    store.updateImage(for: task, filename: filename)
-                                }
-                            },
                             editTrigger: Binding(
                                 get: { editingTaskId == task.id },
                                 set: { isEditing in
@@ -270,9 +251,8 @@ struct ContentView: View {
             }
             return
         }
-        store.addTask(title: trimmed, imageFilename: newTaskImageFilename)
+        store.addTask(title: trimmed)
         newTaskText = ""
-        newTaskImageFilename = nil
         isInputFocused = true
         activateWindow()
     }
@@ -313,14 +293,6 @@ struct ContentView: View {
                 editingTaskId = task.id
                 activateWindow()
             }
-            Button(task.imageFilename == nil ? "Add image…" : "Replace image…") {
-                pickImageForTask(task)
-            }
-            if task.imageFilename != nil {
-                Button("Remove image") {
-                    store.updateImage(for: task, filename: nil)
-                }
-            }
             if task.isImportant {
                 Button("Unmark as important") {
                     store.setImportant(false, for: task)
@@ -333,94 +305,6 @@ struct ContentView: View {
         }
     }
 
-    private var draftImageView: AnyView? {
-        guard let filename = newTaskImageFilename else { return nil }
-        guard let nsImage = ImageStore.thumbnail(named: filename, size: 40) else { return nil }
-        return AnyView(
-            ZStack {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
-
-                RoundedRectangle(cornerRadius: 100, style: .continuous)
-                    .fill(Color.black.opacity(isDraftImageHovered ? 0.2 : 0))
-                    .frame(width: 40, height: 40)
-
-                Button(action: removeDraftImage) {
-                    ZStack {
-                        Circle()
-                            .fill(Theme.textPrimary)
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.white)
-                    }
-                    .frame(width: 16, height: 16)
-                }
-                .buttonStyle(.plain)
-                .opacity(isDraftImageHovered ? 1 : 0)
-            }
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isDraftImageHovered = hovering
-            }
-            .animation(.easeInOut(duration: 0.18), value: isDraftImageHovered)
-        )
-    }
-
-    private func removeDraftImage() {
-        if let filename = newTaskImageFilename {
-            ImageStore.deleteImage(named: filename)
-        }
-        newTaskImageFilename = nil
-    }
-
-    private func handleImageProviders(_ providers: [NSItemProvider]) -> Bool {
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                    guard let data = item as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil),
-                          let image = NSImage(contentsOf: url) else { return }
-                    saveDraftImage(image)
-                }
-                return true
-            }
-            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
-                    guard let data, let image = NSImage(data: data) else { return }
-                    saveDraftImage(image)
-                }
-                return true
-            }
-        }
-        return false
-    }
-
-    private func saveDraftImage(_ image: NSImage) {
-        DispatchQueue.main.async {
-            if let existing = newTaskImageFilename {
-                ImageStore.deleteImage(named: existing)
-            }
-            newTaskImageFilename = ImageStore.saveImage(image)
-        }
-    }
-
-    private func pickImageForTask(_ task: TaskItem) {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.begin { response in
-            guard response == .OK, let url = panel.url, let image = NSImage(contentsOf: url) else { return }
-            if let filename = ImageStore.saveImage(image) {
-                DispatchQueue.main.async {
-                    store.updateImage(for: task, filename: filename)
-                }
-            }
-        }
-    }
 }
 
 private extension ContentView {
@@ -477,11 +361,7 @@ private extension ContentView {
 
     var listContentHeight: CGFloat {
         let rowHeights = store.tasks.map { task -> CGFloat in
-            if task.isDivider {
-                return Layout.dividerRowHeight
-            }
-            let base = Layout.rowHeight
-            return task.imageFilename == nil ? base : base + Layout.taskImageSpacing + Layout.taskImageSize
+            task.isDivider ? Layout.dividerRowHeight : Layout.rowHeight
         }
         let rowsHeight = rowHeights.reduce(0, +)
         let spacingHeight = CGFloat(max(0, store.tasks.count - 1)) * Layout.listRowSpacing
@@ -550,8 +430,6 @@ private enum Layout {
 
     static let rowHeight: CGFloat = 48
     static let dividerRowHeight: CGFloat = 30
-    static let taskImageSize: CGFloat = 100
-    static let taskImageSpacing: CGFloat = 12
     static let listRowSpacing: CGFloat = 10
     static let listTopPadding: CGFloat = 20
     static let listVerticalPadding: CGFloat = 4
