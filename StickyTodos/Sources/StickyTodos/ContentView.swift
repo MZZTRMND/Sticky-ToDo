@@ -30,7 +30,12 @@ struct ContentView: View {
                         header(dayNumber: dayNumber, date: date)
                         inputRow
                     }
-                    list
+                    if store.tasks.isEmpty {
+                        Color.clear
+                            .frame(height: Layout.emptyStateBottomSpace)
+                    } else {
+                        list
+                    }
                 }
                 .padding(.top, Layout.cardPadding)
                 .padding(.horizontal, Layout.cardPadding)
@@ -364,14 +369,13 @@ private extension ContentView {
     }
 
     var windowHeight: CGFloat {
-        let listCount = store.tasks.count
-        let listHeight = listCount == 0
-            ? 0
+        let listHeight = store.tasks.isEmpty
+            ? Layout.emptyStateBottomSpace
             : listContentHeight
-        let dynamicHeight = (Layout.cardPadding * 2)
+        let dynamicHeight = Layout.cardPadding
             + Layout.headerHeight
             + Layout.inputHeight
-            + (Layout.headerToInputSpacing * 2)
+            + Layout.headerToInputSpacing
             + listHeight
         return store.tasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
@@ -480,4 +484,5 @@ private enum Layout {
     static let listTopPadding: CGFloat = 16
     static let listBottomPadding: CGFloat = 16
     static let listMaxHeight: CGFloat = 600
+    static let emptyStateBottomSpace: CGFloat = 20
 }
