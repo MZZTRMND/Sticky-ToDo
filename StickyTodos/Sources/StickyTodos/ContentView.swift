@@ -7,7 +7,6 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isAddHovered = false
     @State private var isInputHovered = false
-    @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
     @State private var isListHovered = false
@@ -61,7 +60,7 @@ struct ContentView: View {
             WindowDragView()
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .top, spacing: Layout.headerInnerSpacing) {
+                    HStack(alignment: .center, spacing: Layout.headerInnerSpacing) {
                         Text("\(dayNumber)")
                             .font(.system(size: Layout.dayFontSize, weight: .bold))
                             .foregroundStyle(primaryTextColor)
@@ -168,21 +167,7 @@ struct ContentView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(Array(store.tasks.enumerated()), id: \.element.id) { index, task in
-                    if task.isDivider {
-                        DividerRow(
-                            title: task.title,
-                            onRename: { store.updateTitle(for: task, title: $0) },
-                            editTrigger: Binding(
-                                get: { editingDividerId == task.id },
-                                set: { isEditing in
-                                    if isEditing {
-                                        editingDividerId = task.id
-                                    } else if editingDividerId == task.id {
-                                        editingDividerId = nil
-                                    }
-                                }
-                            )
-                        )
+                    listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
                             draggingId = task.id
@@ -192,33 +177,6 @@ struct ContentView: View {
                         .contextMenu {
                             rowContextMenu(for: task)
                         }
-                    } else {
-                        TaskRow(
-                            task: task,
-                            onToggle: { store.toggleDone(for: task) },
-                            onDelete: { store.delete(task) },
-                            onRename: { store.updateTitle(for: task, title: $0) },
-                            editTrigger: Binding(
-                                get: { editingTaskId == task.id },
-                                set: { isEditing in
-                                    if isEditing {
-                                        editingTaskId = task.id
-                                    } else if editingTaskId == task.id {
-                                        editingTaskId = nil
-                                    }
-                                }
-                            )
-                        )
-                        .opacity(draggingId == task.id ? 0.4 : 1.0)
-                        .onDrag {
-                            draggingId = task.id
-                            return NSItemProvider(object: task.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
-                        .contextMenu {
-                            rowContextMenu(for: task)
-                        }
-                    }
 
                     if index < store.tasks.count - 1 {
                         Color.clear
@@ -235,12 +193,32 @@ struct ContentView: View {
                 }
             }
             .padding(.top, Layout.listTopPadding)
+            .padding(.bottom, Layout.listBottomPadding)
         }
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
         .frame(maxHeight: Layout.listMaxHeight)
         .onHover { hovering in
             isListHovered = hovering
+        }
+    }
+
+    @ViewBuilder
+    private func listItem(for task: TaskItem) -> some View {
+        if task.isDivider {
+            DividerRow(
+                title: task.title,
+                onRename: { store.updateTitle(for: task, title: $0) },
+                editTrigger: dividerEditBinding(for: task.id)
+            )
+        } else {
+            TaskRow(
+                task: task,
+                onToggle: { store.toggleDone(for: task) },
+                onDelete: { store.delete(task) },
+                onRename: { store.updateTitle(for: task, title: $0) },
+                editTrigger: taskEditBinding(for: task.id)
+            )
         }
     }
 
@@ -294,16 +272,36 @@ struct ContentView: View {
                 editingTaskId = task.id
                 activateWindow()
             }
-            if task.isImportant {
-                Button("Unmark as important") {
-                    store.setImportant(false, for: task)
-                }
-            } else {
-                Button("Mark as important") {
-                    store.setImportant(true, for: task)
-                }
+            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
+                store.setImportant(task.isImportant == false, for: task)
             }
         }
+    }
+
+    private func dividerEditBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { editingDividerId == id },
+            set: { isEditing in
+                if isEditing {
+                    editingDividerId = id
+                } else if editingDividerId == id {
+                    editingDividerId = nil
+                }
+            }
+        )
+    }
+
+    private func taskEditBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { editingTaskId == id },
+            set: { isEditing in
+                if isEditing {
+                    editingTaskId = id
+                } else if editingTaskId == id {
+                    editingTaskId = nil
+                }
+            }
+        )
     }
 
 }
@@ -328,23 +326,22 @@ private extension ContentView {
     var inputBackground: some View {
         let fill = isDark
             ? Color(nsColor: NSColor(calibratedRed: 0.141, green: 0.141, blue: 0.141, alpha: 1.0)) // #242424
-            : Color.white
+            : (isInputHovered
+               ? Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0)) // #F0F0F0
+               : Color(nsColor: NSColor(calibratedRed: 0.961, green: 0.961, blue: 0.961, alpha: 1.0))) // #F5F5F5
         let stroke = isDark
             ? (isInputHovered
                ? Color(nsColor: NSColor(calibratedRed: 0.22, green: 0.22, blue: 0.22, alpha: 1.0)) // #383838
                : Color(nsColor: NSColor(calibratedRed: 0.188, green: 0.188, blue: 0.188, alpha: 1.0))) // #303030
-            : Color.black.opacity(isInputHovered ? 0.15 : 0.08)
+            : .clear
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
             .fill(fill)
             .animation(.easeInOut(duration: 0.18), value: isInputHovered)
             .overlay(
                 RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-                    .stroke(stroke, lineWidth: 1)
+                    .stroke(stroke, lineWidth: isDark ? 1 : 0)
             )
-            // Keep both shadows to preserve the current visual (stroke + soft drop)
-            .shadow(color: isDark ? .clear : Color.black.opacity(0.08), radius: 0, x: 0, y: 0)
-            .shadow(color: isDark ? .clear : Color.black.opacity(0.08), radius: 3, x: 0, y: 1.5)
     }
 
     var windowHeight: CGFloat {
@@ -366,16 +363,12 @@ private extension ContentView {
         }
         let rowsHeight = rowHeights.reduce(0, +)
         let spacingHeight = CGFloat(max(0, store.tasks.count - 1)) * Layout.listRowSpacing
-        return rowsHeight + spacingHeight + Layout.listVerticalPadding + Layout.listTopPadding
+        return rowsHeight + spacingHeight + Layout.listTopPadding + Layout.listBottomPadding
     }
 
 
     var completedCount: Int {
         store.tasks.filter { $0.isDone }.count
-    }
-
-    var remainingCount: Int {
-        max(0, store.taskCount - completedCount)
     }
 
     var counterProgress: CGFloat {
@@ -398,20 +391,19 @@ private enum Layout {
     static let cardWidth: CGFloat = 350
     static let cardPadding: CGFloat = 20
 
-    static let emptyHeight: CGFloat = 200
-    static let maxHeight: CGFloat = 550
+    static let maxHeight: CGFloat = 600
 
     static let headerHeight: CGFloat = 60
-    static let headerLineHeight: CGFloat = 30
+    static let headerLineHeight: CGFloat = 24
     static let headerTrailingPadding: CGFloat = 8
     static let headerInnerSpacing: CGFloat = 8
-    static let headerToInputSpacing: CGFloat = 24
-    static let counterSize: CGFloat = 30
-    static let counterLineWidth: CGFloat = 6
+    static let headerToInputSpacing: CGFloat = 20
+    static let counterSize: CGFloat = 24
+    static let counterLineWidth: CGFloat = 4
 
-    static let dayFontSize: CGFloat = 66
-    static let monthFontSize: CGFloat = 24
-    static let weekdayFontSize: CGFloat = 24
+    static let dayFontSize: CGFloat = 56
+    static let monthFontSize: CGFloat = 20
+    static let weekdayFontSize: CGFloat = 20
     static let dayFrameWidth: CGFloat = 46
 
     static let inputHeight: CGFloat = 56
@@ -430,7 +422,7 @@ private enum Layout {
     static let rowHeight: CGFloat = 48
     static let dividerRowHeight: CGFloat = 30
     static let listRowSpacing: CGFloat = 10
-    static let listTopPadding: CGFloat = 20
-    static let listVerticalPadding: CGFloat = 4
-    static let listMaxHeight: CGFloat = 550
+    static let listTopPadding: CGFloat = 16
+    static let listBottomPadding: CGFloat = 16
+    static let listMaxHeight: CGFloat = 600
 }

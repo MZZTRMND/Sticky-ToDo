@@ -63,10 +63,6 @@ final class TaskStore: ObservableObject {
         tasks.filter { $0.isDivider == false }.count
     }
 
-    func clearCompleted() {
-        tasks.removeAll { $0.isDone }
-    }
-
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
         do {

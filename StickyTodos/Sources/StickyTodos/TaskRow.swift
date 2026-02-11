@@ -90,9 +90,10 @@ struct TaskRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
+        .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill(isRowHovered ? rowHoverColor : .clear)
+                .fill(isRowHovered ? rowHoverColor : Color.white.opacity(0.001))
         )
         .onHover { hovering in
             isRowHovered = hovering

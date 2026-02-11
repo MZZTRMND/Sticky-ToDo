@@ -23,10 +23,6 @@ struct ReorderDropDelegate: DropDelegate {
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        // No-op
+        return DropProposal(operation: .move)
     }
 }
