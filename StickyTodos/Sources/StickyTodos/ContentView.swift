@@ -81,21 +81,22 @@ struct ContentView: View {
                 Spacer()
 
                 if store.taskCount > 0 {
-                    Button(action: clearCompleted) {
-                        Text(counterLabel)
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(counterColor)
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.2), value: store.taskCount)
+                    ZStack {
+                        Circle()
+                            .stroke(counterTrackColor, lineWidth: Layout.counterLineWidth)
+                            .frame(width: Layout.counterSize, height: Layout.counterSize)
+
+                        Circle()
+                            .trim(from: 0, to: counterProgress)
+                            .stroke(
+                                counterProgressColor,
+                                style: StrokeStyle(lineWidth: Layout.counterLineWidth, lineCap: .butt)
+                            )
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: Layout.counterSize, height: Layout.counterSize)
+                            .animation(.easeInOut(duration: 0.2), value: counterProgress)
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, -25)
-                    .onHover { hovering in
-                        isCounterHovered = hovering
-                    }
-                    .disabled(completedCount == 0)
-                    .help(completedCount > 0 ? "Clear \(completedCount)" : "Task count")
                 }
             }
             .frame(height: Layout.headerHeight, alignment: .top)
@@ -373,25 +374,21 @@ private extension ContentView {
         store.tasks.filter { $0.isDone }.count
     }
 
-    var counterLabel: String {
-        if isCounterHovered && completedCount > 0 {
-            return "Clear \(completedCount)"
-        }
-        return "\(completedCount) of \(store.taskCount) tasks"
+    var remainingCount: Int {
+        max(0, store.taskCount - completedCount)
     }
 
-    var counterColor: Color {
-        if isCounterHovered {
-            return completedCount == 0
-                ? (isDark ? Color.white.opacity(0.35) : Theme.textPrimary.opacity(0.35))
-                : (isDark ? Color.white.opacity(0.8) : Theme.textPrimary.opacity(0.8))
-        }
-        return isDark ? Color.white.opacity(0.4) : Theme.textPrimary.opacity(0.4)
+    var counterProgress: CGFloat {
+        guard store.taskCount > 0 else { return 0 }
+        return CGFloat(completedCount) / CGFloat(store.taskCount)
     }
 
-    func clearCompleted() {
-        guard completedCount > 0 else { return }
-        store.clearCompleted()
+    var counterTrackColor: Color {
+        isDark ? Color.white.opacity(0.18) : Theme.textPrimary.opacity(0.12)
+    }
+
+    var counterProgressColor: Color {
+        Color(nsColor: NSColor(calibratedRed: 0.07, green: 0.72, blue: 0.16, alpha: 1.0))
     }
 
 }
@@ -409,6 +406,8 @@ private enum Layout {
     static let headerTrailingPadding: CGFloat = 8
     static let headerInnerSpacing: CGFloat = 8
     static let headerToInputSpacing: CGFloat = 24
+    static let counterSize: CGFloat = 30
+    static let counterLineWidth: CGFloat = 6
 
     static let dayFontSize: CGFloat = 66
     static let monthFontSize: CGFloat = 24
