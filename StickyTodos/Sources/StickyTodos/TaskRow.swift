@@ -69,7 +69,7 @@ struct TaskRow: View {
 
             if task.isImportant {
                 Circle()
-                    .fill(Color.red)
+                    .fill(Theme.accentYellow)
                     .frame(width: 8, height: 8)
             }
 

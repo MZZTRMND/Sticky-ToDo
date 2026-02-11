@@ -7,6 +7,7 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
     @State private var isAddHovered = false
     @State private var isInputHovered = false
+    @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
     @State private var isListHovered = false
@@ -18,23 +19,32 @@ struct ContentView: View {
     var body: some View {
         let date = Date.now
         let dayNumber = Calendar.current.component(.day, from: date)
-        ZStack {
-            RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
-                .fill(cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
+        ZStack(alignment: .topTrailing) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                    .fill(cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
 
-            VStack(spacing: 0) {
-                VStack(spacing: Layout.headerToInputSpacing) {
-                    header(dayNumber: dayNumber, date: date)
-                    inputRow
+                VStack(spacing: 0) {
+                    VStack(spacing: Layout.headerToInputSpacing) {
+                        header(dayNumber: dayNumber, date: date)
+                        inputRow
+                    }
+                    list
                 }
-                list
+                .padding(.top, Layout.cardPadding)
+                .padding(.horizontal, Layout.cardPadding)
             }
-            .padding(.top, Layout.cardPadding)
-            .padding(.horizontal, Layout.cardPadding)
+            .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
 
+            if isCounterHovered && store.taskCount > 0 {
+                counterTooltip
+                    .padding(.top, Layout.counterTooltipTop)
+                    .padding(.trailing, Layout.counterTooltipTrailing)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .zIndex(2)
+            }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
         .frame(minWidth: Layout.cardWidth, maxWidth: 600)
         .frame(height: windowHeight)
         .onAppear {
@@ -95,7 +105,16 @@ struct ContentView: View {
                             .frame(width: Layout.counterSize, height: Layout.counterSize)
                             .animation(.easeInOut(duration: 0.2), value: counterProgress)
                     }
+                    .frame(width: Layout.counterHitSize, height: Layout.counterHitSize)
+                    .contentShape(Rectangle())
+                    .scaleEffect(isCounterHovered ? 1.08 : 1.0)
+                    .animation(.easeInOut(duration: 0.15), value: isCounterHovered)
                     .padding(.top, -25)
+                    .onHover { hovering in
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isCounterHovered = hovering
+                        }
+                    }
                 }
             }
             .frame(height: Layout.headerHeight, alignment: .top)
@@ -225,7 +244,7 @@ struct ContentView: View {
     private func addTask() {
         let trimmed = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.35)) {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
                 shakeTrigger += 1
             }
             return
@@ -371,6 +390,10 @@ private extension ContentView {
         store.tasks.filter { $0.isDone }.count
     }
 
+    var remainingCount: Int {
+        max(0, store.taskCount - completedCount)
+    }
+
     var counterProgress: CGFloat {
         guard store.taskCount > 0 else { return 0 }
         return CGFloat(completedCount) / CGFloat(store.taskCount)
@@ -392,6 +415,27 @@ private extension ContentView {
         isDark ? Theme.textPrimary : .white
     }
 
+    var counterTooltip: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Completed: \(completedCount)")
+            Text("Not completed: \(remainingCount)")
+        }
+        .font(.system(size: 12, weight: .regular))
+        .foregroundStyle(isDark ? Color.white : Theme.textPrimary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isDark ? Color.black.opacity(0.88) : Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(isDark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
+        .fixedSize()
+    }
+
 }
 
 private enum Layout {
@@ -408,6 +452,9 @@ private enum Layout {
     static let headerToInputSpacing: CGFloat = 20
     static let counterSize: CGFloat = 24
     static let counterLineWidth: CGFloat = 4
+    static let counterHitSize: CGFloat = 36
+    static let counterTooltipTop: CGFloat = 40
+    static let counterTooltipTrailing: CGFloat = 8
 
     static let dayFontSize: CGFloat = 56
     static let monthFontSize: CGFloat = 20
