@@ -65,7 +65,7 @@ struct DividerRow: View {
     }
 
     private var textColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5)
+        colorScheme == .dark ? Color.white.opacity(0.4) : Theme.textPrimary.opacity(0.4)
     }
 
     private func startEdit() {

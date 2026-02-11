@@ -161,11 +161,11 @@ struct TaskRow: View {
     }
 
     private var trashColor: Color {
-        colorScheme == .dark ? .white : Theme.textPrimary.opacity(0.5)
+        colorScheme == .dark ? Color.white.opacity(0.4) : Theme.textPrimary.opacity(0.4)
     }
 
     private var completedTextColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.25) : Theme.textPrimary.opacity(0.5)
+        colorScheme == .dark ? Color.white.opacity(0.25) : Theme.textPrimary.opacity(0.4)
     }
 
     private var hasImage: Bool {

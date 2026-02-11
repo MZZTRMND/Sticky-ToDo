@@ -60,7 +60,7 @@ struct ContentView: View {
     }
 
     private func header(dayNumber: Int, date: Date) -> some View {
-        return ZStack {
+        ZStack {
             WindowDragView()
             HStack {
                 VStack(alignment: .leading, spacing: 0) {
@@ -85,19 +85,12 @@ struct ContentView: View {
 
                 if store.taskCount > 0 {
                     Button(action: clearCompleted) {
-                        HStack(spacing: 2) {
-                            if completedCount > 0 {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color.green)
-                            }
-                            Text(counterLabel)
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(counterColor)
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
-                                .animation(.easeInOut(duration: 0.2), value: store.taskCount)
-                        }
+                        Text(counterLabel)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(counterColor)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(.easeInOut(duration: 0.2), value: store.taskCount)
                     }
                     .buttonStyle(.plain)
                     .padding(.top, -25)
@@ -120,7 +113,7 @@ struct ContentView: View {
     }
 
     private var inputRow: some View {
-        return ZStack {
+        ZStack {
             inputBackground
             HStack {
                 ZStack(alignment: .leading) {
@@ -176,7 +169,7 @@ struct ContentView: View {
             isInputFocused = true
         }
         .onDrop(of: [UTType.image, UTType.fileURL], isTargeted: nil) { providers in
-            return handleImageProviders(providers)
+            handleImageProviders(providers)
         }
         .onPasteCommand(of: [.image]) { providers in
             _ = handleImageProviders(providers)
@@ -438,23 +431,23 @@ private extension ContentView {
     }
 
     var placeholderTextColor: Color {
-        isDark ? Color.white.opacity(0.5) : Theme.placeholder
+        isDark ? Color.white.opacity(0.4) : Theme.placeholder
     }
 
     var cardBackground: Color {
         isDark
-            ? Color(nsColor: NSColor(calibratedRed: 0.149, green: 0.149, blue: 0.145, alpha: 1.0)) // #262625
+            ? Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0)) // #1E1E1E
             : .white
     }
 
     var inputBackground: some View {
         let fill = isDark
-            ? Color(nsColor: NSColor(calibratedRed: 0.18, green: 0.18, blue: 0.176, alpha: 1.0)) // #2E2E2D
+            ? Color(nsColor: NSColor(calibratedRed: 0.141, green: 0.141, blue: 0.141, alpha: 1.0)) // #242424
             : Color.white
         let stroke = isDark
             ? (isInputHovered
-               ? Color(nsColor: NSColor(calibratedRed: 0.251, green: 0.251, blue: 0.243, alpha: 1.0)) // #40403E
-               : Color(nsColor: NSColor(calibratedRed: 0.219, green: 0.219, blue: 0.216, alpha: 1.0))) // #383837
+               ? Color(nsColor: NSColor(calibratedRed: 0.22, green: 0.22, blue: 0.22, alpha: 1.0)) // #383838
+               : Color(nsColor: NSColor(calibratedRed: 0.188, green: 0.188, blue: 0.188, alpha: 1.0))) // #303030
             : Color.black.opacity(isInputHovered ? 0.15 : 0.08)
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
@@ -496,12 +489,6 @@ private extension ContentView {
     }
 
 
-    var taskCountLabel: String {
-        let count = store.taskCount
-        return "\(count) task" + (count == 1 ? "" : "s")
-    }
-
-
     var completedCount: Int {
         store.tasks.filter { $0.isDone }.count
     }
@@ -519,7 +506,7 @@ private extension ContentView {
                 ? (isDark ? Color.white.opacity(0.35) : Theme.textPrimary.opacity(0.35))
                 : (isDark ? Color.white.opacity(0.8) : Theme.textPrimary.opacity(0.8))
         }
-        return isDark ? Color.white.opacity(0.5) : Theme.textPrimary.opacity(0.5)
+        return isDark ? Color.white.opacity(0.4) : Theme.textPrimary.opacity(0.4)
     }
 
     func clearCompleted() {
@@ -535,7 +522,7 @@ private enum Layout {
     static let cardPadding: CGFloat = 20
 
     static let emptyHeight: CGFloat = 200
-    static let maxHeight: CGFloat = 500
+    static let maxHeight: CGFloat = 550
 
     static let headerHeight: CGFloat = 60
     static let headerLineHeight: CGFloat = 30
@@ -553,7 +540,7 @@ private enum Layout {
     static let inputFontSize: CGFloat = 16
     static let inputTextLeading: CGFloat = 24
 
-    static let addButtonWidth: CGFloat = 50
+    static let addButtonWidth: CGFloat = 40
     static let addButtonHeight: CGFloat = 40
     static let addButtonCornerRadius: CGFloat = 20
     static let addButtonTrailing: CGFloat = 10
