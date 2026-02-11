@@ -134,11 +134,11 @@ struct ContentView: View {
                 Button(action: addTask) {
                     Image(systemName: "plus")
                         .font(.system(size: Layout.addIconSize, weight: .medium))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(addButtonIconColor)
                         .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
                         .background(
                             RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                .fill(Theme.accentYellow)
+                                .fill(addButtonBackgroundColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -381,7 +381,15 @@ private extension ContentView {
     }
 
     var counterProgressColor: Color {
-        Color(nsColor: NSColor(calibratedRed: 0.07, green: 0.72, blue: 0.16, alpha: 1.0))
+        isDark ? .white : Theme.textPrimary
+    }
+
+    var addButtonBackgroundColor: Color {
+        isDark ? .white : Theme.textPrimary
+    }
+
+    var addButtonIconColor: Color {
+        isDark ? Theme.textPrimary : .white
     }
 
 }
