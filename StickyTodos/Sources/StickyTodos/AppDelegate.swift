@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     private var toggleWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -77,6 +78,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        let aboutItem = NSMenuItem(title: "About Sticky ToDo", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        menu.addItem(.separator())
+
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -95,6 +102,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleWindowMenuItem = toggleItem
         updateWindowMenuItemTitle()
         statusItem = item
+    }
+
+    @objc private func showAbout() {
+        if aboutWindow == nil {
+            let hostingView = NSHostingView(
+                rootView: AboutView(versionText: appVersionText)
+            )
+            let aboutPanel = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: 220),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            aboutPanel.title = "About Sticky ToDo"
+            aboutPanel.isReleasedWhenClosed = false
+            aboutPanel.contentView = hostingView
+            aboutWindow = aboutPanel
+        }
+
+        aboutWindow?.center()
+        aboutWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func showSettings() {
@@ -142,6 +171,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+
+    private var appVersionText: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "Version \(short) (\(build))"
     }
 }
 
