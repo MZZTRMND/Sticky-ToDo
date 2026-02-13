@@ -129,7 +129,9 @@ struct ContentView: View {
     }
 
     private var inputRow: some View {
-        ZStack {
+        let hasInput = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+
+        return ZStack {
             inputBackground
             HStack {
                 ZStack(alignment: .leading) {
@@ -150,27 +152,34 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button(action: addTask) {
-                    Image(systemName: "plus")
-                        .font(.system(size: Layout.addIconSize, weight: .medium))
-                        .foregroundStyle(addButtonIconColor)
-                        .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
-                        .background(
-                            RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                .fill(addButtonBackgroundColor)
-                        )
+                if hasInput {
+                    Button(action: addTask) {
+                        Image(systemName: "plus")
+                            .font(.system(size: Layout.addIconSize, weight: .medium))
+                            .foregroundStyle(addButtonIconColor)
+                            .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
+                            .background(
+                                RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
+                                    .fill(addButtonBackgroundColor)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add task")
+                    .scaleEffect(isAddHovered ? 1.1 : 1.0)
+                    .animation(.spring(response: Layout.addButtonSpringResponse, dampingFraction: Layout.addButtonSpringDamping), value: isAddHovered)
+                    .onHover { hovering in
+                        isAddHovered = hovering
+                    }
+                    .padding(.trailing, Layout.addButtonTrailing)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing)),
+                        removal: .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing))
+                    ))
                 }
-                .buttonStyle(.plain)
-                .help("Add task")
-                .scaleEffect(isAddHovered ? 1.1 : 1.0)
-                .animation(.spring(response: Layout.addButtonSpringResponse, dampingFraction: Layout.addButtonSpringDamping), value: isAddHovered)
-                .onHover { hovering in
-                    isAddHovered = hovering
-                }
-                .padding(.trailing, Layout.addButtonTrailing)
             }
         }
         .frame(height: Layout.inputHeight)
+        .animation(.easeInOut(duration: 0.2), value: hasInput)
         .onHover { hovering in
             isInputHovered = hovering
         }
@@ -346,8 +355,8 @@ private extension ContentView {
         let fill = isDark
             ? Color(nsColor: NSColor(calibratedRed: 0.141, green: 0.141, blue: 0.141, alpha: 1.0)) // #242424
             : (isInputHovered
-               ? Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0)) // #F0F0F0
-               : Color(nsColor: NSColor(calibratedRed: 0.961, green: 0.961, blue: 0.961, alpha: 1.0))) // #F5F5F5
+               ? Color(nsColor: NSColor(calibratedRed: 0.922, green: 0.922, blue: 0.922, alpha: 1.0)) // #EBEBEB
+               : Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0))) // #F0F0F0
         let stroke = isDark
             ? (isInputHovered
                ? Color(nsColor: NSColor(calibratedRed: 0.22, green: 0.22, blue: 0.22, alpha: 1.0)) // #383838
@@ -463,7 +472,7 @@ private enum Layout {
 
     static let inputHeight: CGFloat = 56
     static let inputCornerRadius: CGFloat = 100
-    static let inputFontSize: CGFloat = 16
+    static let inputFontSize: CGFloat = 18
     static let inputTextLeading: CGFloat = 24
 
     static let addButtonWidth: CGFloat = 40
