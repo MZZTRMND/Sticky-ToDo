@@ -11,6 +11,7 @@ struct TaskRow: View {
     @State private var isRowHovered = false
     @State private var isEditing = false
     @State private var draftTitle = ""
+    @State private var progressRotation: Double = 0
     @FocusState private var isEditingFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
@@ -20,7 +21,14 @@ struct TaskRow: View {
                 .fill(task.isDone ? (colorScheme == .dark ? .white : Theme.doneGreen) : .clear)
                 .overlay(
                     Group {
-                        if task.isDone == false {
+                        if task.isInProgress {
+                            Circle()
+                                .stroke(
+                                    circleStrokeColor,
+                                    style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3])
+                                )
+                                .rotationEffect(.degrees(progressRotation))
+                        } else if task.isDone == false {
                             Circle()
                                 .stroke(circleStrokeColor, lineWidth: 2)
                         }
@@ -101,6 +109,12 @@ struct TaskRow: View {
         .animation(.easeInOut(duration: 0.18), value: isRowHovered)
         .animation(.easeInOut(duration: 0.18), value: isCircleHovered)
         .animation(.easeInOut(duration: 0.18), value: isTrashHovered)
+        .onAppear {
+            updateProgressAnimation(task.isInProgress)
+        }
+        .onChange(of: task.isInProgress) { isInProgress in
+            updateProgressAnimation(isInProgress)
+        }
         .onChange(of: editTrigger) { shouldEdit in
             guard shouldEdit else { return }
             startEdit()
@@ -152,5 +166,16 @@ struct TaskRow: View {
     private func cancelEdit() {
         isEditing = false
         draftTitle = task.title
+    }
+
+    private func updateProgressAnimation(_ isInProgress: Bool) {
+        if isInProgress {
+            progressRotation = 0
+            withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                progressRotation = 360
+            }
+        } else {
+            progressRotation = 0
+        }
     }
 }

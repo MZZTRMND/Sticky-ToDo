@@ -33,6 +33,9 @@ final class TaskStore: ObservableObject {
     func toggleDone(for task: TaskItem) {
         guard let index = indexOfTask(task) else { return }
         tasks[index].isDone.toggle()
+        if tasks[index].isDone {
+            tasks[index].isInProgress = false
+        }
     }
 
     func delete(_ task: TaskItem) {
@@ -48,6 +51,14 @@ final class TaskStore: ObservableObject {
     func setImportant(_ isImportant: Bool, for task: TaskItem) {
         guard let index = indexOfTask(task) else { return }
         tasks[index].isImportant = isImportant
+    }
+
+    func setInProgress(_ isInProgress: Bool, for task: TaskItem) {
+        guard let index = indexOfTask(task) else { return }
+        tasks[index].isInProgress = isInProgress
+        if isInProgress {
+            tasks[index].isDone = false
+        }
     }
 
     func moveTask(from sourceId: UUID, to targetId: UUID) {

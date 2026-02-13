@@ -2,7 +2,8 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @StateObject private var store = TaskStore()
+    @EnvironmentObject private var store: TaskStore
+    @EnvironmentObject private var windowModeController: WindowModeController
     @State private var newTaskText = ""
     @FocusState private var isInputFocused: Bool
     @State private var isAddHovered = false
@@ -127,6 +128,9 @@ struct ContentView: View {
         }
         .frame(height: Layout.headerHeight, alignment: .top)
         .contextMenu {
+            Button("\(windowModeController.menuTitle) ⌘⌥M") {
+                windowModeController.requestToggle()
+            }
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
@@ -134,7 +138,9 @@ struct ContentView: View {
     }
 
     private var inputRow: some View {
-        ZStack {
+        let hasInput = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+
+        return ZStack {
             inputBackground
             HStack {
                 ZStack(alignment: .leading) {
@@ -155,27 +161,34 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button(action: addTask) {
-                    Image(systemName: "plus")
-                        .font(.system(size: Layout.addIconSize, weight: .medium))
-                        .foregroundStyle(addButtonIconColor)
-                        .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
-                        .background(
-                            RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                .fill(addButtonBackgroundColor)
-                        )
+                if hasInput {
+                    Button(action: addTask) {
+                        Image(systemName: "plus")
+                            .font(.system(size: Layout.addIconSize, weight: .medium))
+                            .foregroundStyle(addButtonIconColor)
+                            .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
+                            .background(
+                                RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
+                                    .fill(addButtonBackgroundColor)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add task")
+                    .scaleEffect(isAddHovered ? 1.1 : 1.0)
+                    .animation(.spring(response: Layout.addButtonSpringResponse, dampingFraction: Layout.addButtonSpringDamping), value: isAddHovered)
+                    .onHover { hovering in
+                        isAddHovered = hovering
+                    }
+                    .padding(.trailing, Layout.addButtonTrailing)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.82, anchor: .center)),
+                        removal: .opacity.combined(with: .scale(scale: 0.94, anchor: .center))
+                    ))
                 }
-                .buttonStyle(.plain)
-                .help("Add task")
-                .scaleEffect(isAddHovered ? 1.1 : 1.0)
-                .animation(.spring(response: Layout.addButtonSpringResponse, dampingFraction: Layout.addButtonSpringDamping), value: isAddHovered)
-                .onHover { hovering in
-                    isAddHovered = hovering
-                }
-                .padding(.trailing, Layout.addButtonTrailing)
             }
         }
         .frame(height: Layout.inputHeight)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: hasInput)
         .onHover { hovering in
             isInputHovered = hovering
         }
@@ -292,12 +305,24 @@ struct ContentView: View {
                 store.delete(task)
             }
         } else {
+            Button(task.isInProgress ? "Unmark in progress" : "Mark as in progress") {
+                store.setInProgress(task.isInProgress == false, for: task)
+            }
+            Divider()
+
+            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
+                store.setImportant(task.isImportant == false, for: task)
+            }
+            Divider()
+
             Button("Edit task") {
                 editingTaskId = task.id
                 activateWindow()
             }
-            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
-                store.setImportant(task.isImportant == false, for: task)
+            Button {
+                store.delete(task)
+            } label: {
+                Text("Delete task")
             }
         }
     }
@@ -351,8 +376,8 @@ private extension ContentView {
         let fill = isDark
             ? Color(nsColor: NSColor(calibratedRed: 0.141, green: 0.141, blue: 0.141, alpha: 1.0)) // #242424
             : (isInputHovered
-               ? Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0)) // #F0F0F0
-               : Color(nsColor: NSColor(calibratedRed: 0.961, green: 0.961, blue: 0.961, alpha: 1.0))) // #F5F5F5
+               ? Color(nsColor: NSColor(calibratedRed: 0.922, green: 0.922, blue: 0.922, alpha: 1.0)) // #EBEBEB
+               : Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0))) // #F0F0F0
         let stroke = isDark
             ? (isInputHovered
                ? Color(nsColor: NSColor(calibratedRed: 0.22, green: 0.22, blue: 0.22, alpha: 1.0)) // #383838
@@ -451,7 +476,7 @@ private enum Layout {
 
     static let headerHeight: CGFloat = 60
     static let headerLineHeight: CGFloat = 24
-    static let headerTrailingPadding: CGFloat = 8
+    static let headerTrailingPadding: CGFloat = 0
     static let headerInnerSpacing: CGFloat = 8
     static let headerToInputSpacing: CGFloat = 20
     static let counterSize: CGFloat = 24
@@ -467,7 +492,7 @@ private enum Layout {
 
     static let inputHeight: CGFloat = 56
     static let inputCornerRadius: CGFloat = 100
-    static let inputFontSize: CGFloat = 16
+    static let inputFontSize: CGFloat = 18
     static let inputTextLeading: CGFloat = 24
 
     static let addButtonWidth: CGFloat = 40
