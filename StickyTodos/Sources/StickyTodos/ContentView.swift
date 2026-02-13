@@ -460,7 +460,7 @@ private enum Layout {
 
     static let headerHeight: CGFloat = 60
     static let headerLineHeight: CGFloat = 24
-    static let headerTrailingPadding: CGFloat = 8
+    static let headerTrailingPadding: CGFloat = 0
     static let headerInnerSpacing: CGFloat = 8
     static let headerToInputSpacing: CGFloat = 20
     static let counterSize: CGFloat = 24
