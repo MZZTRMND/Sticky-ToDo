@@ -10,6 +10,7 @@ final class KeyablePanel: NSPanel {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
+    private var toggleWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -59,9 +60,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+        let toggleItem = NSMenuItem(title: "Hide App", action: #selector(toggleWindowVisibility), keyEquivalent: "h")
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
         item.menu = menu
+        toggleWindowMenuItem = toggleItem
+        updateWindowMenuItemTitle()
         statusItem = item
+    }
+
+    @objc private func toggleWindowVisibility() {
+        guard let window else { return }
+
+        if window.isVisible {
+            window.orderOut(nil)
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        updateWindowMenuItemTitle()
+    }
+
+    private func updateWindowMenuItemTitle() {
+        toggleWindowMenuItem?.title = (window?.isVisible == true) ? "Hide App" : "Show App"
     }
 
     @objc private func quitApp() {
