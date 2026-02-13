@@ -8,8 +8,10 @@ final class KeyablePanel: NSPanel {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let settings = AppSettings.shared
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
+    private var settingsWindow: NSWindow?
     private var toggleWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -19,7 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createWindow() {
-        let hostingView = NSHostingView(rootView: ContentView())
+        let hostingView = NSHostingView(
+            rootView: RootContentView()
+                .environmentObject(settings)
+        )
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
 
@@ -34,6 +39,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         window = panel
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(mainWindowVisibilityDidChange),
+            name: NSWindow.didBecomeKeyNotification,
+            object: panel
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(mainWindowVisibilityDidChange),
+            name: NSWindow.didResignKeyNotification,
+            object: panel
+        )
     }
 
     private func configurePanel(_ panel: NSPanel, hostingView: NSView) {
@@ -60,6 +77,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
         let toggleItem = NSMenuItem(title: "Hide App", action: #selector(toggleWindowVisibility), keyEquivalent: "h")
         toggleItem.target = self
         menu.addItem(toggleItem)
@@ -76,6 +97,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            let hostingView = NSHostingView(
+                rootView: SettingsView()
+                    .environmentObject(settings)
+            )
+            let settingsPanel = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 300, height: 110),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            settingsPanel.title = "Settings"
+            settingsPanel.isReleasedWhenClosed = false
+            settingsPanel.contentView = hostingView
+            settingsWindow = settingsPanel
+        }
+
+        settingsWindow?.center()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func toggleWindowVisibility() {
         guard let window else { return }
 
@@ -88,11 +132,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateWindowMenuItemTitle()
     }
 
+    @objc private func mainWindowVisibilityDidChange() {
+        updateWindowMenuItemTitle()
+    }
+
     private func updateWindowMenuItemTitle() {
         toggleWindowMenuItem?.title = (window?.isVisible == true) ? "Hide App" : "Show App"
     }
 
     @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+}
+
+private struct RootContentView: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        ContentView()
+            .preferredColorScheme(settings.preferredColorScheme)
     }
 }
