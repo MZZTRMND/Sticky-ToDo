@@ -172,14 +172,14 @@ struct ContentView: View {
                     }
                     .padding(.trailing, Layout.addButtonTrailing)
                     .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing)),
-                        removal: .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing))
+                        insertion: .opacity.combined(with: .scale(scale: 0.82, anchor: .center)),
+                        removal: .opacity.combined(with: .scale(scale: 0.94, anchor: .center))
                     ))
                 }
             }
         }
         .frame(height: Layout.inputHeight)
-        .animation(.easeInOut(duration: 0.2), value: hasInput)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: hasInput)
         .onHover { hovering in
             isInputHovered = hovering
         }
