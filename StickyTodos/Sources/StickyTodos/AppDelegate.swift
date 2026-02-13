@@ -9,23 +9,30 @@ final class KeyablePanel: NSPanel {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings.shared
+    private let store = TaskStore()
+    private let windowModeController = WindowModeController.shared
     private var statusItem: NSStatusItem?
     private var window: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var windowMode: WindowMode = .full
+    private var fullWindowFrame: NSRect?
     private var toggleWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         configureStatusItem()
         createWindow()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(toggleMinimizeMode),
+            name: .stickyTodosToggleWindowMode,
+            object: nil
+        )
     }
 
     private func createWindow() {
-        let hostingView = NSHostingView(
-            rootView: RootContentView()
-                .environmentObject(settings)
-        )
+        let hostingView = NSHostingView(rootView: fullRootView())
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
 
@@ -40,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         window = panel
+        applyWindowMode(animated: false)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(mainWindowVisibilityDidChange),
@@ -161,12 +169,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateWindowMenuItemTitle()
     }
 
+    @objc private func toggleMinimizeMode() {
+        setWindowMode(windowMode == .full ? .compact : .full, animated: true)
+    }
+
     @objc private func mainWindowVisibilityDidChange() {
         updateWindowMenuItemTitle()
     }
 
     private func updateWindowMenuItemTitle() {
         toggleWindowMenuItem?.title = (window?.isVisible == true) ? "Hide App" : "Show App"
+    }
+
+    private func setWindowMode(_ mode: WindowMode, animated: Bool) {
+        guard mode != windowMode else { return }
+        if mode == .compact, let window {
+            fullWindowFrame = window.frame
+        }
+        windowMode = mode
+        windowModeController.mode = mode
+        applyWindowMode(animated: animated)
+    }
+
+    private func applyWindowMode(animated: Bool) {
+        guard let window else { return }
+
+        switch windowMode {
+        case .full:
+            window.styleMask.insert(.resizable)
+            window.minSize = NSSize(width: 350, height: 200)
+            window.maxSize = NSSize(width: 600, height: 600)
+            window.contentView = NSHostingView(rootView: fullRootView())
+            if let fullWindowFrame {
+                window.setFrame(fullWindowFrame, display: true, animate: animated)
+            }
+        case .compact:
+            window.styleMask.remove(.resizable)
+            window.minSize = NSSize(width: 160, height: 160)
+            window.maxSize = NSSize(width: 160, height: 160)
+            window.contentView = NSHostingView(rootView: compactRootView())
+            var frame = window.frame
+            frame.size = NSSize(width: 160, height: 160)
+            window.setFrame(frame, display: true, animate: animated)
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func fullRootView() -> some View {
+        RootContentView()
+            .environmentObject(settings)
+            .environmentObject(store)
+            .environmentObject(windowModeController)
+    }
+
+    private func compactRootView() -> some View {
+        CompactCounterView {
+            self.setWindowMode(.full, animated: true)
+        }
+        .environmentObject(settings)
+        .environmentObject(store)
+        .environmentObject(windowModeController)
+        .preferredColorScheme(settings.preferredColorScheme)
     }
 
     @objc private func quitApp() {
@@ -182,9 +247,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct RootContentView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var store: TaskStore
 
     var body: some View {
         ContentView()
+            .environmentObject(store)
             .preferredColorScheme(settings.preferredColorScheme)
     }
 }

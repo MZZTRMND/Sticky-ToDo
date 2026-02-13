@@ -2,7 +2,8 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @StateObject private var store = TaskStore()
+    @EnvironmentObject private var store: TaskStore
+    @EnvironmentObject private var windowModeController: WindowModeController
     @State private var newTaskText = ""
     @FocusState private var isInputFocused: Bool
     @State private var isAddHovered = false
@@ -122,6 +123,9 @@ struct ContentView: View {
         }
         .frame(height: Layout.headerHeight, alignment: .top)
         .contextMenu {
+            Button("\(windowModeController.menuTitle) ⌘⌥M") {
+                windowModeController.requestToggle()
+            }
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
