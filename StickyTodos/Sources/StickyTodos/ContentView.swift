@@ -300,12 +300,24 @@ struct ContentView: View {
                 store.delete(task)
             }
         } else {
+            Button(task.isInProgress ? "Unmark in progress" : "Mark as in progress") {
+                store.setInProgress(task.isInProgress == false, for: task)
+            }
+            Divider()
+
+            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
+                store.setImportant(task.isImportant == false, for: task)
+            }
+            Divider()
+
             Button("Edit task") {
                 editingTaskId = task.id
                 activateWindow()
             }
-            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
-                store.setImportant(task.isImportant == false, for: task)
+            Button {
+                store.delete(task)
+            } label: {
+                Text("Delete task")
             }
         }
     }
