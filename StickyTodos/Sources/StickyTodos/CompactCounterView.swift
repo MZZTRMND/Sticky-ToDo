@@ -1,33 +1,53 @@
 import SwiftUI
+import AppKit
 
 struct CompactCounterView: View {
     @EnvironmentObject private var store: TaskStore
     @EnvironmentObject private var settings: AppSettings
     let onExpand: () -> Void
+    @State private var hasAppeared = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Circle()
+        ZStack {
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(backgroundColor)
 
             Text("\(store.taskCount)")
-                .font(.system(size: 72, weight: .bold))
+                .font(.system(size: 68, weight: .bold))
                 .foregroundStyle(numberColor)
-
-            Circle()
-                .fill(badgeBackgroundColor)
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(badgeIconColor)
-                )
-                .offset(x: 8, y: -8)
+                .frame(width: 100, height: 100, alignment: .center)
+                .overlay(alignment: .topTrailing) {
+                    Circle()
+                        .fill(badgeBackgroundColor)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(badgeIconColor)
+                        )
+                        .offset(x: 0, y: 0)
+                }
         }
-        .frame(width: 160, height: 160)
-        .contentShape(Circle())
-        .onTapGesture {
+        .frame(width: 100, height: 100)
+        .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .scaleEffect(hasAppeared ? 1.0 : 0.92)
+        .opacity(hasAppeared ? 1.0 : 0.0)
+        .onAppear {
+            hasAppeared = false
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                hasAppeared = true
+            }
+        }
+        .onTapGesture(count: 2) {
             onExpand()
+        }
+        .contextMenu {
+            Button("Expand ⌘⌥M") {
+                onExpand()
+            }
+            Button("Quit") {
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 

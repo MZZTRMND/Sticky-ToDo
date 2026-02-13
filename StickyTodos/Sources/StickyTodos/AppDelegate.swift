@@ -193,28 +193,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyWindowMode(animated: Bool) {
         guard let window else { return }
-
+        let currentFrame = window.frame
+        let targetFrame: NSRect
         switch windowMode {
         case .full:
             window.styleMask.insert(.resizable)
             window.minSize = NSSize(width: 350, height: 200)
             window.maxSize = NSSize(width: 600, height: 600)
             window.contentView = NSHostingView(rootView: fullRootView())
-            if let fullWindowFrame {
-                window.setFrame(fullWindowFrame, display: true, animate: animated)
-            }
+            let targetSize = fullWindowFrame?.size ?? currentFrame.size
+            targetFrame = centeredFrame(from: currentFrame, targetSize: targetSize)
         case .compact:
             window.styleMask.remove(.resizable)
-            window.minSize = NSSize(width: 160, height: 160)
-            window.maxSize = NSSize(width: 160, height: 160)
+            window.minSize = NSSize(width: 100, height: 100)
+            window.maxSize = NSSize(width: 100, height: 100)
             window.contentView = NSHostingView(rootView: compactRootView())
-            var frame = window.frame
-            frame.size = NSSize(width: 160, height: 160)
-            window.setFrame(frame, display: true, animate: animated)
+            targetFrame = centeredFrame(from: currentFrame, targetSize: NSSize(width: 100, height: 100))
+        }
+
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.22
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
         }
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func centeredFrame(from currentFrame: NSRect, targetSize: NSSize) -> NSRect {
+        let centerX = currentFrame.midX
+        let centerY = currentFrame.midY
+        return NSRect(
+            x: centerX - (targetSize.width / 2),
+            y: centerY - (targetSize.height / 2),
+            width: targetSize.width,
+            height: targetSize.height
+        )
     }
 
     private func fullRootView() -> some View {
