@@ -15,10 +15,10 @@ final class WindowModeController: ObservableObject {
     }
 
     func requestToggle() {
-        NotificationCenter.default.post(name: .stickyTodosToggleWindowMode, object: nil)
+        NotificationCenter.default.post(name: .stickyToDoToggleWindowMode, object: nil)
     }
 }
 
 extension Notification.Name {
-    static let stickyTodosToggleWindowMode = Notification.Name("StickyTodos.ToggleWindowMode")
+    static let stickyToDoToggleWindowMode = Notification.Name("StickyToDo.ToggleWindowMode")
 }

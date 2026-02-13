@@ -17,7 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var windowMode: WindowMode = .full
     private var fullWindowFrame: NSRect?
-    private var toggleWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -26,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(toggleMinimizeMode),
-            name: .stickyTodosToggleWindowMode,
+            name: .stickyToDoToggleWindowMode,
             object: nil
         )
     }
@@ -82,11 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "StickyTodos")
+            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "StickyToDo")
         }
 
         let menu = NSMenu()
-        let aboutItem = NSMenuItem(title: "About Sticky ToDo", action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About StickyToDo", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
@@ -96,10 +95,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        let toggleItem = NSMenuItem(title: "Hide App", action: #selector(toggleWindowVisibility), keyEquivalent: "h")
-        toggleItem.target = self
-        menu.addItem(toggleItem)
-
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
@@ -107,8 +102,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
 
         item.menu = menu
-        toggleWindowMenuItem = toggleItem
-        updateWindowMenuItemTitle()
         statusItem = item
     }
 
@@ -123,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            aboutPanel.title = "About Sticky ToDo"
+            aboutPanel.title = "About StickyToDo"
             aboutPanel.isReleasedWhenClosed = false
             aboutPanel.contentView = hostingView
             aboutWindow = aboutPanel
@@ -157,28 +150,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func toggleWindowVisibility() {
-        guard let window else { return }
-
-        if window.isVisible {
-            window.orderOut(nil)
-        } else {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        updateWindowMenuItemTitle()
-    }
-
     @objc private func toggleMinimizeMode() {
         setWindowMode(windowMode == .full ? .compact : .full, animated: true)
     }
 
     @objc private func mainWindowVisibilityDidChange() {
-        updateWindowMenuItemTitle()
-    }
-
-    private func updateWindowMenuItemTitle() {
-        toggleWindowMenuItem?.title = (window?.isVisible == true) ? "Hide App" : "Show App"
+        // Reserved for future window-state menu sync.
     }
 
     private func setWindowMode(_ mode: WindowMode, animated: Bool) {

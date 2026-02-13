@@ -5,7 +5,7 @@ final class TaskStore: ObservableObject {
         didSet { save() }
     }
 
-    private let storageKey = "StickyTodos.tasks"
+    private let storageKey = "StickyToDo.tasks"
 
     init() {
         load()

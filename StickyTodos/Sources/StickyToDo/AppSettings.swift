@@ -36,7 +36,7 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    private static let appearanceKey = "StickyTodos.appearance"
+    private static let appearanceKey = "StickyToDo.appearance"
 
     private init() {
         let stored = UserDefaults.standard.string(forKey: Self.appearanceKey)
