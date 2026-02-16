@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TaskRow: View {
     let task: TaskItem
@@ -12,6 +13,10 @@ struct TaskRow: View {
     @State private var isEditing = false
     @State private var draftTitle = ""
     @State private var progressRotation: Double = 0
+    @State private var isTitleHovered = false
+    @State private var showTitleTooltip = false
+    @State private var titleAvailableWidth: CGFloat = 0
+    @State private var tooltipWorkItem: DispatchWorkItem?
     @FocusState private var isEditingFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
@@ -66,6 +71,19 @@ struct TaskRow: View {
                         .foregroundStyle(task.isDone ? completedTextColor : textPrimaryColor)
                         .strikethrough(task.isDone, color: completedTextColor)
                         .lineLimit(1)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(key: TaskTitleWidthPreferenceKey.self, value: proxy.size.width)
+                            }
+                        )
+                        .onPreferenceChange(TaskTitleWidthPreferenceKey.self) { value in
+                            titleAvailableWidth = value
+                        }
+                        .onHover { hovering in
+                            isTitleHovered = hovering
+                            handleTitleHoverChanged(hovering)
+                        }
                         .onTapGesture(count: 2) {
                             startEdit()
                         }
@@ -77,7 +95,7 @@ struct TaskRow: View {
 
             if task.isImportant {
                 Circle()
-                    .fill(Theme.accentYellow)
+                    .fill(Color(nsColor: NSColor(calibratedRed: 0.851, green: 0.463, blue: 0.271, alpha: 1.0))) // #D97645
                     .frame(width: 8, height: 8)
             }
 
@@ -104,6 +122,14 @@ struct TaskRow: View {
             RoundedRectangle(cornerRadius: 100, style: .continuous)
                 .fill(isRowHovered ? rowHoverColor : Color.white.opacity(0.001))
         )
+        .overlay(alignment: .topLeading) {
+            if showTitleTooltip && isEditing == false && isTitleTruncated {
+                taskTitleTooltip
+                    .padding(.leading, 48)
+                    .offset(y: -10)
+                    .transition(.opacity)
+            }
+        }
         .onHover { hovering in
             isRowHovered = hovering
         }
@@ -120,6 +146,9 @@ struct TaskRow: View {
             guard shouldEdit else { return }
             startEdit()
             editTrigger = false
+        }
+        .onDisappear {
+            cancelTitleTooltipWorkItem()
         }
     }
 
@@ -150,6 +179,8 @@ struct TaskRow: View {
     }
 
     private func startEdit() {
+        showTitleTooltip = false
+        cancelTitleTooltipWorkItem()
         draftTitle = task.title
         isEditing = true
         isEditingFocused = true
@@ -162,11 +193,15 @@ struct TaskRow: View {
             onRename(trimmed)
         }
         isEditing = false
+        showTitleTooltip = false
+        cancelTitleTooltipWorkItem()
     }
 
     private func cancelEdit() {
         isEditing = false
         draftTitle = task.title
+        showTitleTooltip = false
+        cancelTitleTooltipWorkItem()
     }
 
     private func updateProgressAnimation(_ isInProgress: Bool) {
@@ -178,5 +213,67 @@ struct TaskRow: View {
         } else {
             progressRotation = 0
         }
+    }
+
+    private var isTitleTruncated: Bool {
+        guard titleAvailableWidth > 0 else { return false }
+        let measured = (task.title as NSString).size(
+            withAttributes: [.font: NSFont.systemFont(ofSize: 16, weight: .regular)]
+        ).width
+        return measured > titleAvailableWidth + 1
+    }
+
+    private var taskTitleTooltip: some View {
+        Text(task.title)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(colorScheme == .dark ? Color.white : Theme.textPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(colorScheme == .dark ? Color.black.opacity(0.88) : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(
+                                colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                                lineWidth: 1
+                            )
+                    )
+            )
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 260, alignment: .leading)
+    }
+
+    private func handleTitleHoverChanged(_ hovering: Bool) {
+        cancelTitleTooltipWorkItem()
+        if hovering == false || isEditing || isTitleTruncated == false {
+            withAnimation(.easeOut(duration: 0.12)) {
+                showTitleTooltip = false
+            }
+            return
+        }
+
+        let workItem = DispatchWorkItem {
+            guard isTitleHovered, isEditing == false, isTitleTruncated else { return }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                showTitleTooltip = true
+            }
+        }
+        tooltipWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+    }
+
+    private func cancelTitleTooltipWorkItem() {
+        tooltipWorkItem?.cancel()
+        tooltipWorkItem = nil
+    }
+}
+
+private struct TaskTitleWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
