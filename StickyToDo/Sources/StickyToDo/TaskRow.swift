@@ -94,6 +94,7 @@ struct TaskRow: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            guard isEditing == false, isTrashHovered == false else { return }
             onToggle()
         }
         .padding(.vertical, 12)

@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "StickyTodos",
+    name: "StickyToDo",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "StickyTodos", targets: ["StickyTodos"])
+        .executable(name: "StickyToDo", targets: ["StickyToDo"])
     ],
     targets: [
         .executableTarget(
-            name: "StickyTodos",
-            path: "Sources/StickyTodos"
+            name: "StickyToDo",
+            path: "Sources/StickyToDo"
         )
     ]
 )
