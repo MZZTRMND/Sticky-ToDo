@@ -2,10 +2,15 @@ import Foundation
 
 final class TaskStore: ObservableObject {
     @Published var tasks: [TaskItem] = [] {
-        didSet { save() }
+        didSet {
+            guard isLoading == false else { return }
+            save()
+        }
     }
 
     private let storageKey = "StickyToDo.tasks"
+    private var isLoading = false
+    private var lastSavedData: Data?
 
     init() {
         load()
@@ -76,18 +81,24 @@ final class TaskStore: ObservableObject {
 
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
+        isLoading = true
+        defer { isLoading = false }
         do {
             let decoded = try JSONDecoder().decode([TaskItem].self, from: data)
             tasks = decoded
+            lastSavedData = data
         } catch {
             tasks = []
+            lastSavedData = nil
         }
     }
 
     private func save() {
         do {
             let data = try JSONEncoder().encode(tasks)
+            guard data != lastSavedData else { return }
             UserDefaults.standard.set(data, forKey: storageKey)
+            lastSavedData = data
         } catch {
             // If save fails, keep running without crashing.
         }
@@ -101,6 +112,6 @@ final class TaskStore: ObservableObject {
     }
 
     private func indexOfTask(_ task: TaskItem) -> Int? {
-        tasks.firstIndex(of: task)
+        tasks.firstIndex { $0.id == task.id }
     }
 }

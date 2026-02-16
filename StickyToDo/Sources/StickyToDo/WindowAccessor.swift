@@ -4,10 +4,19 @@ import AppKit
 struct WindowAccessor: NSViewRepresentable {
     let onWindow: (NSWindow) -> Void
 
+    final class Coordinator {
+        weak var lastWindow: NSWindow?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
+                context.coordinator.lastWindow = window
                 onWindow(window)
             }
         }
@@ -17,6 +26,8 @@ struct WindowAccessor: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             if let window = nsView.window {
+                guard context.coordinator.lastWindow !== window else { return }
+                context.coordinator.lastWindow = window
                 onWindow(window)
             }
         }

@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var windowMode: WindowMode = .full
     private var fullWindowFrame: NSRect?
+    private var toggleWindowMenuItem: NSMenuItem?
+    private var hostingView: NSHostingView<AnyView>?
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -31,9 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createWindow() {
-        let hostingView = NSHostingView(rootView: fullRootView())
-        hostingView.wantsLayer = true
-        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        let rootHostingView = NSHostingView(rootView: AnyView(fullRootView()))
+        rootHostingView.wantsLayer = true
+        rootHostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView = rootHostingView
 
         let panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
@@ -41,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        configurePanel(panel, hostingView: hostingView)
+        configurePanel(panel, hostingView: rootHostingView)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -177,14 +184,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.styleMask.insert(.resizable)
             window.minSize = NSSize(width: 350, height: 200)
             window.maxSize = NSSize(width: 600, height: 600)
-            window.contentView = NSHostingView(rootView: fullRootView())
+            setRootView(for: .full)
             let targetSize = fullWindowFrame?.size ?? currentFrame.size
             targetFrame = centeredFrame(from: currentFrame, targetSize: targetSize)
         case .compact:
             window.styleMask.remove(.resizable)
             window.minSize = NSSize(width: 100, height: 100)
             window.maxSize = NSSize(width: 100, height: 100)
-            window.contentView = NSHostingView(rootView: compactRootView())
+            setRootView(for: .compact)
             targetFrame = centeredFrame(from: currentFrame, targetSize: NSSize(width: 100, height: 100))
         }
 
@@ -199,6 +206,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func setRootView(for mode: WindowMode) {
+        switch mode {
+        case .full:
+            hostingView?.rootView = AnyView(fullRootView())
+        case .compact:
+            hostingView?.rootView = AnyView(compactRootView())
+        }
     }
 
     private func centeredFrame(from currentFrame: NSRect, targetSize: NSSize) -> NSRect {

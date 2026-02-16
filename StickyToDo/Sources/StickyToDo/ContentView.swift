@@ -59,7 +59,6 @@ struct ContentView: View {
         .background(
             WindowAccessor { window in
                 windowRef = window
-                bringWindowToFront()
                 updateWindowDragBehavior()
             }
         )
@@ -277,12 +276,6 @@ struct ContentView: View {
         NSApp.activate(ignoringOtherApps: true)
         windowRef?.makeKeyAndOrderFront(nil)
         windowRef?.makeKey()
-    }
-
-    private func bringWindowToFront() {
-        windowRef?.makeKeyAndOrderFront(nil)
-        windowRef?.makeKey()
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func updateWindowDragBehavior() {
