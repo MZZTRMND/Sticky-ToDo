@@ -92,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        let aboutItem = NSMenuItem(title: "About StickyToDo", action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About Sticky ToDo", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            aboutPanel.title = "About StickyToDo"
+            aboutPanel.title = "About Sticky ToDo"
             aboutPanel.isReleasedWhenClosed = false
             aboutPanel.contentView = hostingView
             aboutWindow = aboutPanel
