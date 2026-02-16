@@ -144,7 +144,7 @@ struct ContentView: View {
             HStack {
                 ZStack(alignment: .leading) {
                     if newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Add today task")
+                        Text("Add today's task")
                             .font(.system(size: Layout.inputFontSize, weight: .regular))
                             .foregroundStyle(placeholderTextColor)
                     }
@@ -440,7 +440,7 @@ private extension ContentView {
     var counterTooltip: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Completed: \(completedCount)")
-            Text("Not completed: \(remainingCount)")
+            Text("Remaining: \(remainingCount)")
         }
         .font(.system(size: 12, weight: .regular))
         .foregroundStyle(isDark ? Color.white : Theme.textPrimary)

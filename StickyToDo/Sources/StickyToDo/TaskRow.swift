@@ -95,7 +95,7 @@ struct TaskRow: View {
 
             if task.isImportant {
                 Circle()
-                    .fill(Color(nsColor: NSColor(calibratedRed: 0.851, green: 0.463, blue: 0.271, alpha: 1.0))) // #D97645
+                    .fill(Theme.accentOrange)
                     .frame(width: 8, height: 8)
             }
 
