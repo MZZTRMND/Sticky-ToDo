@@ -27,6 +27,21 @@ final class AppSettings: ObservableObject {
             UserDefaults.standard.set(appearance.rawValue, forKey: Self.appearanceKey)
         }
     }
+    @Published var launchAtLogin: Bool {
+        didSet {
+            UserDefaults.standard.set(launchAtLogin, forKey: Self.launchAtLoginKey)
+        }
+    }
+    @Published var showInMenuBar: Bool {
+        didSet {
+            UserDefaults.standard.set(showInMenuBar, forKey: Self.showInMenuBarKey)
+        }
+    }
+    @Published var showCompletedTasks: Bool {
+        didSet {
+            UserDefaults.standard.set(showCompletedTasks, forKey: Self.showCompletedTasksKey)
+        }
+    }
 
     var preferredColorScheme: ColorScheme? {
         switch appearance {
@@ -37,9 +52,27 @@ final class AppSettings: ObservableObject {
     }
 
     private static let appearanceKey = "StickyToDo.appearance"
+    private static let launchAtLoginKey = "StickyToDo.launchAtLogin"
+    private static let showInMenuBarKey = "StickyToDo.showInMenuBar"
+    private static let showCompletedTasksKey = "StickyToDo.showCompletedTasks"
 
     private init() {
         let stored = UserDefaults.standard.string(forKey: Self.appearanceKey)
         appearance = Appearance(rawValue: stored ?? "") ?? .system
+        if UserDefaults.standard.object(forKey: Self.launchAtLoginKey) == nil {
+            launchAtLogin = false
+        } else {
+            launchAtLogin = UserDefaults.standard.bool(forKey: Self.launchAtLoginKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.showInMenuBarKey) == nil {
+            showInMenuBar = true
+        } else {
+            showInMenuBar = UserDefaults.standard.bool(forKey: Self.showInMenuBarKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.showCompletedTasksKey) == nil {
+            showCompletedTasks = true
+        } else {
+            showCompletedTasks = UserDefaults.standard.bool(forKey: Self.showCompletedTasksKey)
+        }
     }
 }

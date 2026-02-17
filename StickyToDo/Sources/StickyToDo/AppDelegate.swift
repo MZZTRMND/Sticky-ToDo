@@ -1,4 +1,6 @@
 import AppKit
+import Combine
+import ServiceManagement
 import SwiftUI
 
 // Borderless panel that can still become key to keep text input focused.
@@ -19,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var fullWindowFrame: NSRect?
     private var toggleWindowMenuItem: NSMenuItem?
     private var hostingView: NSHostingView<AnyView>?
+    private var cancellables: Set<AnyCancellable> = []
 
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -26,7 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        configureStatusItem()
+        configureStatusItemIfNeeded()
+        bindSettingsObservers()
+        applyLaunchAtLoginPreference(settings.launchAtLogin)
         createWindow()
         NotificationCenter.default.addObserver(
             self,
@@ -85,7 +90,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
 
-    private func configureStatusItem() {
+    private func configureStatusItemIfNeeded() {
+        guard settings.showInMenuBar else {
+            if let item = statusItem {
+                NSStatusBar.system.removeStatusItem(item)
+                statusItem = nil
+            }
+            return
+        }
+        guard statusItem == nil else { return }
+
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "StickyToDo")
@@ -110,6 +124,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         statusItem = item
+    }
+
+    private func bindSettingsObservers() {
+        settings.$showInMenuBar
+            .dropFirst()
+            .sink { [weak self] isVisible in
+                guard let self else { return }
+                if isVisible {
+                    self.configureStatusItemIfNeeded()
+                } else if let item = self.statusItem {
+                    NSStatusBar.system.removeStatusItem(item)
+                    self.statusItem = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        settings.$launchAtLogin
+            .dropFirst()
+            .sink { [weak self] isEnabled in
+                self?.applyLaunchAtLoginPreference(isEnabled)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyLaunchAtLoginPreference(_ enabled: Bool) {
+        do {
+            if enabled {
+                if SMAppService.mainApp.status != .enabled {
+                    try SMAppService.mainApp.register()
+                }
+            } else if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            let syncedValue = (SMAppService.mainApp.status == .enabled)
+            if settings.launchAtLogin != syncedValue {
+                settings.launchAtLogin = syncedValue
+            }
+        }
     }
 
     @objc private func showAbout() {
@@ -141,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .environmentObject(settings)
             )
             let settingsPanel = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 300, height: 110),
+                contentRect: NSRect(x: 0, y: 0, width: 320, height: 200),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
