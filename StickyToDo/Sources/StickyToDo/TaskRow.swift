@@ -21,7 +21,7 @@ struct TaskRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 0) {
             Circle()
                 .fill(task.isDone ? (colorScheme == .dark ? .white : Theme.doneGreen) : .clear)
                 .overlay(
@@ -89,26 +89,29 @@ struct TaskRow: View {
                         }
                 }
             }
+            .padding(.leading, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
-            Spacer()
+            HStack(spacing: 12) {
+                if task.isImportant {
+                    Circle()
+                        .fill(Theme.accentOrange)
+                        .frame(width: 8, height: 8)
+                }
 
-            if task.isImportant {
-                Circle()
-                    .fill(Theme.accentOrange)
-                    .frame(width: 8, height: 8)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(isTrashHovered ? .red : trashColor)
+                        .font(.system(size: 18, weight: .regular))
+                }
+                .buttonStyle(.plain)
+                .opacity(isRowHovered ? 1 : 0)
+                .onHover { hovering in
+                    isTrashHovered = hovering
+                }
             }
-
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .foregroundStyle(isTrashHovered ? .red : trashColor)
-                    .font(.system(size: 18, weight: .regular))
-            }
-            .buttonStyle(.plain)
-            .opacity(isRowHovered ? 1 : 0)
-            .onHover { hovering in
-                isTrashHovered = hovering
-            }
+            .padding(.leading, 6)
         }
         .contentShape(Rectangle())
         .onTapGesture {
