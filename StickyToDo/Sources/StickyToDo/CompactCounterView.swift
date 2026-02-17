@@ -13,11 +13,7 @@ struct CompactCounterView: View {
                 .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .fill(isDark ? Color.black.opacity(0.34) : Color.white.opacity(0.34))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .stroke(isDark ? Theme.glassBorderDark : Theme.glassBorderLight, lineWidth: 1)
+                        .fill(isDark ? Color.black.opacity(0.80) : Color.white.opacity(0.80))
                 )
 
             Text("\(store.taskCount)")
