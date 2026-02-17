@@ -469,6 +469,10 @@ private extension ContentView {
                 .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isDark ? Color.clear : Color.white.opacity(0.80))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(cardBorderColor, lineWidth: 1)
                 )
         )
