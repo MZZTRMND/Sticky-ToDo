@@ -3,10 +3,13 @@ import Foundation
 final class TaskStore: ObservableObject {
     @Published var tasks: [TaskItem] = [] {
         didSet {
+            updateDerivedState()
             guard isLoading == false else { return }
             save()
         }
     }
+    @Published private(set) var taskCount: Int = 0
+    @Published private(set) var completedTaskCount: Int = 0
 
     private let storageKey = "StickyToDo.tasks"
     private var isLoading = false
@@ -14,6 +17,7 @@ final class TaskStore: ObservableObject {
 
     init() {
         load()
+        updateDerivedState()
     }
 
     func addTask(title: String) {
@@ -75,10 +79,6 @@ final class TaskStore: ObservableObject {
         tasks.insert(item, at: adjustedIndex)
     }
 
-    var taskCount: Int {
-        tasks.filter { $0.isDivider == false }.count
-    }
-
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
         isLoading = true
@@ -101,6 +101,23 @@ final class TaskStore: ObservableObject {
             lastSavedData = data
         } catch {
             // If save fails, keep running without crashing.
+        }
+    }
+
+    private func updateDerivedState() {
+        var total = 0
+        var completed = 0
+        for task in tasks where task.isDivider == false {
+            total += 1
+            if task.isDone {
+                completed += 1
+            }
+        }
+        if taskCount != total {
+            taskCount = total
+        }
+        if completedTaskCount != completed {
+            completedTaskCount = completed
         }
     }
 

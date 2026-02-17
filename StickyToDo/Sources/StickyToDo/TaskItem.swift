@@ -45,7 +45,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         isInProgress = try container.decodeIfPresent(Bool.self, forKey: .isInProgress) ?? false
         isDivider = try container.decodeIfPresent(Bool.self, forKey: .isDivider) ?? false
         isImportant = try container.decodeIfPresent(Bool.self, forKey: .isImportant) ?? false
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 
     func encode(to encoder: Encoder) throws {
