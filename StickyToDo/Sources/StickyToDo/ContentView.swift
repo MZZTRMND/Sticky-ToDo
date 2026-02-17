@@ -3,6 +3,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject private var store: TaskStore
+    @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var windowModeController: WindowModeController
     @State private var newTaskText = ""
     @FocusState private var isInputFocused: Bool
@@ -34,7 +35,7 @@ struct ContentView: View {
                         header(dayNumber: dayNumber, date: date)
                         inputRow
                     }
-                    if store.tasks.isEmpty {
+                    if displayedTasks.isEmpty {
                         Color.clear
                             .frame(height: Layout.emptyStateBottomSpace)
                     } else {
@@ -209,7 +210,7 @@ struct ContentView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(Array(store.tasks.enumerated()), id: \.element.id) { index, task in
+                ForEach(Array(displayedTasks.enumerated()), id: \.element.id) { index, task in
                     listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
@@ -221,13 +222,13 @@ struct ContentView: View {
                             rowContextMenu(for: task)
                         }
 
-                    if index < store.tasks.count - 1 {
+                    if index < displayedTasks.count - 1 {
                         Color.clear
                             .frame(height: Layout.listRowSpacing)
                             .contentShape(Rectangle())
                             .contextMenu {
                                 Button("Add divider") {
-                                    store.addDivider(at: index + 1)
+                                    addDivider(afterVisibleIndex: index)
                                     activateWindow()
                                     isInputFocused = true
                                 }
@@ -277,6 +278,15 @@ struct ContentView: View {
         newTaskText = ""
         isInputFocused = true
         activateWindow()
+    }
+
+    private func addDivider(afterVisibleIndex index: Int) {
+        let insertionVisibleIndex = index + 1
+        if insertionVisibleIndex < displayedTasks.count {
+            store.addDivider(above: displayedTasks[insertionVisibleIndex])
+        } else {
+            store.addDivider(at: store.tasks.count)
+        }
     }
 
     private func activateWindow() {
@@ -356,6 +366,12 @@ struct ContentView: View {
 }
 
 private extension ContentView {
+    var displayedTasks: [TaskItem] {
+        settings.showCompletedTasks
+            ? store.tasks
+            : store.tasks.filter { $0.isDivider || $0.isDone == false }
+    }
+
     var isDark: Bool { colorScheme == .dark }
 
     var primaryTextColor: Color {
@@ -389,7 +405,7 @@ private extension ContentView {
     }
 
     var windowHeight: CGFloat {
-        let listHeight = store.tasks.isEmpty
+        let listHeight = displayedTasks.isEmpty
             ? Layout.emptyStateBottomSpace
             : listContentHeight
         let dynamicHeight = Layout.cardPadding
@@ -397,15 +413,15 @@ private extension ContentView {
             + Layout.inputHeight
             + Layout.headerToInputSpacing
             + listHeight
-        return store.tasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
+        return displayedTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
 
     var listContentHeight: CGFloat {
-        let rowHeights = store.tasks.map { task -> CGFloat in
+        let rowHeights = displayedTasks.map { task -> CGFloat in
             task.isDivider ? Layout.dividerRowHeight : Layout.rowHeight
         }
         let rowsHeight = rowHeights.reduce(0, +)
-        let spacingHeight = CGFloat(max(0, store.tasks.count - 1)) * Layout.listRowSpacing
+        let spacingHeight = CGFloat(max(0, displayedTasks.count - 1)) * Layout.listRowSpacing
         return rowsHeight + spacingHeight + Layout.listTopPadding + Layout.listBottomPadding
     }
 
