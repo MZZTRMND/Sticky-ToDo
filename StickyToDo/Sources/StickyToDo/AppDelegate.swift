@@ -197,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if animated {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.22
+                context.duration = 0.16
                 window.animator().setFrame(targetFrame, display: true)
             }
         } else {
