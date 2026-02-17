@@ -89,26 +89,28 @@ struct TaskRow: View {
                         }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
-            Spacer()
+            HStack(spacing: 12) {
+                if task.isImportant {
+                    Circle()
+                        .fill(Theme.accentOrange)
+                        .frame(width: 8, height: 8)
+                }
 
-            if task.isImportant {
-                Circle()
-                    .fill(Theme.accentOrange)
-                    .frame(width: 8, height: 8)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(isTrashHovered ? .red : trashColor)
+                        .font(.system(size: 18, weight: .regular))
+                }
+                .buttonStyle(.plain)
+                .opacity(isRowHovered ? 1 : 0)
+                .onHover { hovering in
+                    isTrashHovered = hovering
+                }
             }
-
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .foregroundStyle(isTrashHovered ? .red : trashColor)
-                    .font(.system(size: 18, weight: .regular))
-            }
-            .buttonStyle(.plain)
-            .opacity(isRowHovered ? 1 : 0)
-            .onHover { hovering in
-                isTrashHovered = hovering
-            }
+            .padding(.leading, 6)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -120,7 +122,7 @@ struct TaskRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill(isRowHovered ? rowHoverColor : Color.white.opacity(0.001))
+                .fill(isRowHovered ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
