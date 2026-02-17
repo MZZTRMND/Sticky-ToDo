@@ -42,7 +42,7 @@ struct ContentView: View {
                         list
                     }
                 }
-                .padding(.top, Layout.cardPadding)
+                .padding(.top, Layout.cardTopPadding)
                 .padding(.horizontal, Layout.cardPadding)
             }
             .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
@@ -408,7 +408,7 @@ private extension ContentView {
         let listHeight = visibleTasks.isEmpty
             ? Layout.emptyStateBottomSpace
             : listContentHeight
-        let dynamicHeight = Layout.cardPadding
+        let dynamicHeight = Layout.cardTopPadding
             + Layout.headerHeight
             + Layout.inputHeight
             + Layout.headerToInputSpacing
@@ -485,7 +485,8 @@ private extension ContentView {
 private enum Layout {
     static let cardCornerRadius: CGFloat = 40
     static let cardWidth: CGFloat = 350
-    static let cardPadding: CGFloat = 20
+    static let cardTopPadding: CGFloat = 16
+    static let cardPadding: CGFloat = 16
 
     static let maxHeight: CGFloat = 600
 
@@ -493,7 +494,7 @@ private enum Layout {
     static let headerLineHeight: CGFloat = 24
     static let headerTrailingPadding: CGFloat = 0
     static let headerInnerSpacing: CGFloat = 8
-    static let headerToInputSpacing: CGFloat = 16
+    static let headerToInputSpacing: CGFloat = 12
     static let counterSize: CGFloat = 24
     static let counterLineWidth: CGFloat = 4
     static let counterHitSize: CGFloat = 36
