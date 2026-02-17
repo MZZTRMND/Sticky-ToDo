@@ -10,7 +10,15 @@ struct CompactCounterView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(backgroundColor)
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .fill(isDark ? Color.black.opacity(0.34) : Color.white.opacity(0.34))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .stroke(isDark ? Theme.glassBorderDark : Theme.glassBorderLight, lineWidth: 1)
+                )
 
             Text("\(store.taskCount)")
                 .font(.system(size: 68, weight: .bold))
@@ -60,12 +68,6 @@ struct CompactCounterView: View {
         case .system:
             return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         }
-    }
-
-    private var backgroundColor: Color {
-        isDark
-            ? Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0))
-            : .white
     }
 
     private var numberColor: Color {

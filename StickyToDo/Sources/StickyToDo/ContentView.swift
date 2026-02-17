@@ -23,8 +23,11 @@ struct ContentView: View {
         ZStack(alignment: .topTrailing) {
             ZStack {
                 RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
-                    .fill(cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
+                    .fill(.regularMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                            .fill(cardGlassTint)
+                    )
 
                 VStack(spacing: 0) {
                     VStack(spacing: Layout.headerToInputSpacing) {
@@ -168,7 +171,11 @@ struct ContentView: View {
                             .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
                             .background(
                                 RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                    .fill(addButtonBackgroundColor)
+                                    .fill(.thinMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
+                                            .fill(addButtonTint)
+                                    )
                             )
                     }
                     .buttonStyle(.plain)
@@ -359,30 +366,25 @@ private extension ContentView {
         isDark ? Color.white.opacity(0.4) : Theme.placeholder
     }
 
-    var cardBackground: Color {
-        isDark
-            ? Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0)) // #1E1E1E
-            : .white
+    var cardGlassTint: Color {
+        isDark ? Color.black.opacity(0.80) : Color.white.opacity(0.80)
+    }
+
+    var cardBorderColor: Color {
+        isDark ? Theme.glassBorderDark : Theme.glassBorderLight
     }
 
     var inputBackground: some View {
-        let fill = isDark
-            ? Color(nsColor: NSColor(calibratedRed: 0.141, green: 0.141, blue: 0.141, alpha: 1.0)) // #242424
-            : (isInputHovered
-               ? Color(nsColor: NSColor(calibratedRed: 0.922, green: 0.922, blue: 0.922, alpha: 1.0)) // #EBEBEB
-               : Color(nsColor: NSColor(calibratedRed: 0.941, green: 0.941, blue: 0.941, alpha: 1.0))) // #F0F0F0
         let stroke = isDark
-            ? (isInputHovered
-               ? Color(nsColor: NSColor(calibratedRed: 0.22, green: 0.22, blue: 0.22, alpha: 1.0)) // #383838
-               : Color(nsColor: NSColor(calibratedRed: 0.188, green: 0.188, blue: 0.188, alpha: 1.0))) // #303030
-            : .clear
+            ? (isInputHovered ? Color.white.opacity(0.26) : Color.white.opacity(0.18))
+            : (isInputHovered ? Color.black.opacity(0.18) : Color.black.opacity(0.10))
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-            .fill(fill)
+            .fill(Color.clear)
             .animation(.easeInOut(duration: 0.18), value: isInputHovered)
             .overlay(
                 RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-                    .stroke(stroke, lineWidth: isDark ? 1 : 0)
+                    .stroke(stroke, lineWidth: 1)
             )
     }
 
@@ -429,7 +431,7 @@ private extension ContentView {
         isDark ? .white : Theme.textPrimary
     }
 
-    var addButtonBackgroundColor: Color {
+    var addButtonTint: Color {
         isDark ? .white : Theme.textPrimary
     }
 
@@ -448,10 +450,10 @@ private extension ContentView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDark ? Color.black.opacity(0.88) : Color.white)
+                .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 1)
+                        .stroke(cardBorderColor, lineWidth: 1)
                 )
         )
         .shadow(color: Color.black.opacity(isDark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
@@ -471,7 +473,7 @@ private enum Layout {
     static let headerLineHeight: CGFloat = 24
     static let headerTrailingPadding: CGFloat = 0
     static let headerInnerSpacing: CGFloat = 8
-    static let headerToInputSpacing: CGFloat = 20
+    static let headerToInputSpacing: CGFloat = 16
     static let counterSize: CGFloat = 24
     static let counterLineWidth: CGFloat = 4
     static let counterHitSize: CGFloat = 36

@@ -123,7 +123,7 @@ struct TaskRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill(isRowHovered ? rowHoverColor : Color.white.opacity(0.001))
+                .fill(isRowHovered ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
