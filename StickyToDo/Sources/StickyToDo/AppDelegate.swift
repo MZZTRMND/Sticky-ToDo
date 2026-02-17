@@ -19,7 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aboutWindow: NSWindow?
     private var windowMode: WindowMode = .full
     private var fullWindowFrame: NSRect?
-    private var toggleWindowMenuItem: NSMenuItem?
     private var hostingView: NSHostingView<AnyView>?
     private var cancellables: Set<AnyCancellable> = []
 
@@ -158,6 +157,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
+            // Keep the toggle consistent with the real system status.
+            // This can fail in some unsigned/dev execution contexts.
             let syncedValue = (SMAppService.mainApp.status == .enabled)
             if settings.launchAtLogin != syncedValue {
                 settings.launchAtLogin = syncedValue

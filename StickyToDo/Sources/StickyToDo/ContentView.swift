@@ -35,7 +35,7 @@ struct ContentView: View {
                         header(dayNumber: dayNumber, date: date)
                         inputRow
                     }
-                    if displayedTasks.isEmpty {
+                    if visibleTasks.isEmpty {
                         Color.clear
                             .frame(height: Layout.emptyStateBottomSpace)
                     } else {
@@ -210,7 +210,7 @@ struct ContentView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(Array(displayedTasks.enumerated()), id: \.element.id) { index, task in
+                ForEach(Array(visibleTasks.enumerated()), id: \.element.id) { index, task in
                     listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
@@ -222,7 +222,7 @@ struct ContentView: View {
                             rowContextMenu(for: task)
                         }
 
-                    if index < displayedTasks.count - 1 {
+                    if index < visibleTasks.count - 1 {
                         Color.clear
                             .frame(height: Layout.listRowSpacing)
                             .contentShape(Rectangle())
@@ -282,8 +282,8 @@ struct ContentView: View {
 
     private func addDivider(afterVisibleIndex index: Int) {
         let insertionVisibleIndex = index + 1
-        if insertionVisibleIndex < displayedTasks.count {
-            store.addDivider(above: displayedTasks[insertionVisibleIndex])
+        if insertionVisibleIndex < visibleTasks.count {
+            store.addDivider(above: visibleTasks[insertionVisibleIndex])
         } else {
             store.addDivider(at: store.tasks.count)
         }
@@ -366,7 +366,7 @@ struct ContentView: View {
 }
 
 private extension ContentView {
-    var displayedTasks: [TaskItem] {
+    var visibleTasks: [TaskItem] {
         settings.showCompletedTasks
             ? store.tasks
             : store.tasks.filter { $0.isDivider || $0.isDone == false }
@@ -405,7 +405,7 @@ private extension ContentView {
     }
 
     var windowHeight: CGFloat {
-        let listHeight = displayedTasks.isEmpty
+        let listHeight = visibleTasks.isEmpty
             ? Layout.emptyStateBottomSpace
             : listContentHeight
         let dynamicHeight = Layout.cardPadding
@@ -413,21 +413,21 @@ private extension ContentView {
             + Layout.inputHeight
             + Layout.headerToInputSpacing
             + listHeight
-        return displayedTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
+        return visibleTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
 
     var listContentHeight: CGFloat {
-        let rowHeights = displayedTasks.map { task -> CGFloat in
+        let rowHeights = visibleTasks.map { task -> CGFloat in
             task.isDivider ? Layout.dividerRowHeight : Layout.rowHeight
         }
         let rowsHeight = rowHeights.reduce(0, +)
-        let spacingHeight = CGFloat(max(0, displayedTasks.count - 1)) * Layout.listRowSpacing
+        let spacingHeight = CGFloat(max(0, visibleTasks.count - 1)) * Layout.listRowSpacing
         return rowsHeight + spacingHeight + Layout.listTopPadding + Layout.listBottomPadding
     }
 
 
     var completedCount: Int {
-        store.tasks.filter { $0.isDone }.count
+        store.completedTaskCount
     }
 
     var remainingCount: Int {
