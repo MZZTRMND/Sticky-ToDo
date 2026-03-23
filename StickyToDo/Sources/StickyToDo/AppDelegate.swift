@@ -145,6 +145,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.applyLaunchAtLoginPreference(isEnabled)
             }
             .store(in: &cancellables)
+
+        settings.$showCompletedTasks
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.refreshCompactWindowSizeIfNeeded(animated: true)
+            }
+            .store(in: &cancellables)
+
+        store.$tasks
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.refreshCompactWindowSizeIfNeeded(animated: true)
+            }
+            .store(in: &cancellables)
     }
 
     private func applyLaunchAtLoginPreference(_ enabled: Bool) {
@@ -243,10 +257,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             targetFrame = centeredFrame(from: currentFrame, targetSize: targetSize)
         case .compact:
             window.styleMask.remove(.resizable)
-            window.minSize = NSSize(width: 100, height: 100)
-            window.maxSize = NSSize(width: 100, height: 100)
+            let compactSize = currentCompactWindowSize()
+            window.minSize = compactSize
+            window.maxSize = compactSize
             setRootView(for: .compact)
-            targetFrame = centeredFrame(from: currentFrame, targetSize: NSSize(width: 100, height: 100))
+            targetFrame = centeredFrame(from: currentFrame, targetSize: compactSize)
         }
 
         if animated {
@@ -260,6 +275,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func currentCompactWindowSize() -> NSSize {
+        let tasksOnly = store.tasks.filter { $0.isDivider == false }
+        let visibleTasks = settings.showCompletedTasks ? tasksOnly : tasksOnly.filter { $0.isDone == false }
+        let previewCount = min(3, visibleTasks.count)
+        let showsOverflowIndicator = visibleTasks.count > 3
+        return CompactCounterView.compactWindowSize(
+            previewCount: previewCount,
+            showsOverflowIndicator: showsOverflowIndicator
+        )
+    }
+
+    private func refreshCompactWindowSizeIfNeeded(animated: Bool) {
+        guard windowMode == .compact, let window else { return }
+        let targetSize = currentCompactWindowSize()
+        guard window.frame.size != targetSize else { return }
+
+        window.minSize = targetSize
+        window.maxSize = targetSize
+        let targetFrame = centeredFrame(from: window.frame, targetSize: targetSize)
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func setRootView(for mode: WindowMode) {
