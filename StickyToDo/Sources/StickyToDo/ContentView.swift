@@ -83,7 +83,8 @@ struct ContentView: View {
                         Text("\(dayNumber)")
                             .font(.system(size: Layout.dayFontSize, weight: .bold))
                             .foregroundStyle(primaryTextColor)
-                            .frame(minWidth: Layout.dayFrameWidth, minHeight: Layout.headerHeight, alignment: .leading)
+                            .frame(minHeight: Layout.headerHeight, alignment: .leading)
+                            .fixedSize(horizontal: true, vertical: false)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(date, format: .dateTime.month(.wide))
                                 .font(.system(size: Layout.monthFontSize, weight: .bold))
@@ -503,7 +504,6 @@ private enum Layout {
     static let dayFontSize: CGFloat = 56
     static let monthFontSize: CGFloat = 20
     static let weekdayFontSize: CGFloat = 20
-    static let dayFrameWidth: CGFloat = 46
 
     static let inputHeight: CGFloat = 56
     static let inputCornerRadius: CGFloat = 100
