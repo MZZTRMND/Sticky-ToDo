@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var store: TaskStore
@@ -16,10 +17,19 @@ struct ContentView: View {
     @State private var windowRef: NSWindow?
     @State private var editingTaskId: UUID?
     @State private var selectedCategoryID: UUID?
+    @State private var editingCategoryID: UUID?
+    @State private var isAllCategoryDropTargeted = false
+    @State private var categoryDropTargetedIDs: Set<UUID> = []
+    @State private var isAllCategoryHovered = false
+    @State private var categoryHoveredIDs: Set<UUID> = []
+    @State private var categoryNameDraft = ""
     @State private var pendingCategoryTaskID: UUID?
     @State private var newCategoryName = ""
     @State private var placeholderIndex = 0
+    @State private var isCategoryModalAnimatingIn = false
+    @State private var categoryShakeTrigger: CGFloat = 0
     @FocusState private var isCategoryInputFocused: Bool
+    @FocusState private var focusedCategoryID: UUID?
     @Environment(\.colorScheme) private var colorScheme
     private let placeholderTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
 
@@ -40,7 +50,9 @@ struct ContentView: View {
                         header(dayNumber: dayNumber, date: date)
                         inputRow
                     }
-                    categorySection
+                    if shouldShowCategorySection {
+                        categorySection
+                    }
                     if visibleTasks.isEmpty {
                         Color.clear
                             .frame(height: Layout.emptyStateBottomSpace)
@@ -50,6 +62,12 @@ struct ContentView: View {
                 }
                 .padding(.top, Layout.cardTopPadding)
                 .padding(.horizontal, Layout.cardPadding)
+
+                if isCategoryCreationPresented {
+                    categoryCreationOverlay
+                        .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                        .zIndex(4)
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
 
@@ -80,6 +98,11 @@ struct ContentView: View {
         }
         .onReceive(placeholderTimer) { _ in
             rotatePlaceholderIfNeeded()
+        }
+        .onChange(of: store.categories) { categories in
+            if let selectedCategoryID, categories.contains(where: { $0.id == selectedCategoryID }) == false {
+                self.selectedCategoryID = nil
+            }
         }
     }
 
@@ -221,86 +244,218 @@ struct ContentView: View {
     }
 
     private var categorySection: some View {
-        VStack(alignment: .leading, spacing: Layout.categoryInputTopSpacing) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Layout.categoryChipSpacing) {
-                    categoryChip(
-                        title: "All",
-                        color: primaryTextColor,
-                        isSelected: selectedCategoryID == nil
-                    ) {
-                        selectedCategoryID = nil
-                    }
-
-                    ForEach(store.categories) { category in
-                        categoryChip(
-                            title: category.name,
-                            color: Theme.color(fromHex: category.colorHex),
-                            isSelected: selectedCategoryID == category.id
-                        ) {
-                            selectedCategoryID = category.id
-                        }
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Layout.categoryChipSpacing) {
+                categoryChip(
+                    title: "All",
+                    isSelected: selectedCategoryID == nil,
+                    isDropHovered: isAllCategoryDropTargeted,
+                    isPointerHovered: isAllCategoryHovered
+                ) {
+                    selectedCategoryID = nil
                 }
-                .padding(.horizontal, 1)
-            }
-            .frame(height: Layout.categoryBarHeight)
+                .onDrop(
+                    of: [UTType.text],
+                    delegate: CategoryChipDropDelegate(
+                        categoryID: nil,
+                        store: store,
+                        draggingId: $draggingId,
+                        isTargeted: $isAllCategoryDropTargeted
+                    )
+                )
+                .onHover { hovering in
+                    isAllCategoryHovered = hovering
+                }
 
-            if pendingCategoryTaskID != nil {
-                categoryInputRow
+                ForEach(store.categories) { category in
+                    categoryChipView(for: category)
+                }
             }
+            .padding(.horizontal, 1)
         }
+        .frame(height: Layout.categoryBarHeight)
         .padding(.top, Layout.inputToCategorySpacing)
     }
 
-    private var categoryInputRow: some View {
-        HStack(spacing: 8) {
+    private var categoryCreationOverlay: some View {
+        ZStack {
+            Color.black.opacity(isCategoryModalAnimatingIn ? 0.30 : 0.0)
+                .onTapGesture {
+                    cancelCategoryCreation()
+                }
+
             TextField("New category", text: $newCategoryName)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(primaryTextColor)
-                .padding(.horizontal, 12)
-                .frame(height: Layout.categoryInputHeight)
+                .padding(.horizontal, 16)
+                .frame(width: 260, height: Layout.categoryModalInputHeight)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isDark ? Color.clear : Color.white)
+                        .overlay {
+                            if isDark {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(.regularMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .fill(Color.black.opacity(0.35))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            }
+                        }
                 )
                 .focused($isCategoryInputFocused)
                 .onSubmit(confirmCategoryCreation)
                 .onExitCommand {
                     cancelCategoryCreation()
                 }
+                .scaleEffect(isCategoryModalAnimatingIn ? 1.0 : 0.965)
+                .opacity(isCategoryModalAnimatingIn ? 1.0 : 0.0)
+                .offset(y: isCategoryModalAnimatingIn ? 0 : 6)
+                .modifier(ShakeEffect(animatableData: categoryShakeTrigger))
         }
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .onAppear {
+            isCategoryModalAnimatingIn = false
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                isCategoryModalAnimatingIn = true
+            }
+        }
+        .onDisappear {
+            isCategoryModalAnimatingIn = false
+        }
+    }
+
+    @ViewBuilder
+    private func categoryChipView(for category: TaskCategory) -> some View {
+        if editingCategoryID == category.id {
+            TextField("", text: $categoryNameDraft)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(primaryTextColor)
+                .padding(.horizontal, Layout.categoryChipHorizontalPadding)
+                .frame(height: Layout.categoryChipHeight)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.clear)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(categoryChipStrokeColor, lineWidth: 1)
+                )
+                .focused($focusedCategoryID, equals: category.id)
+                .onSubmit {
+                    commitCategoryRename(categoryID: category.id)
+                }
+                .onExitCommand {
+                    cancelCategoryRename()
+                }
+                .onChange(of: focusedCategoryID) { focused in
+                    guard focused != category.id else { return }
+                    if editingCategoryID == category.id {
+                        commitCategoryRename(categoryID: category.id)
+                    }
+                }
+        } else {
+            categoryChip(
+                title: category.name,
+                isSelected: selectedCategoryID == category.id,
+                isDropHovered: categoryDropTargetedIDs.contains(category.id),
+                isPointerHovered: categoryHoveredIDs.contains(category.id)
+            ) {
+                selectedCategoryID = category.id
+            }
+            .contextMenu {
+                Button("Edit name") {
+                    beginCategoryRename(category)
+                }
+                Button("Delete tab") {
+                    deleteCategory(category.id)
+                }
+            }
+            .onDrop(
+                of: [UTType.text],
+                delegate: CategoryChipDropDelegate(
+                    categoryID: category.id,
+                    store: store,
+                    draggingId: $draggingId,
+                    isTargeted: categoryDropTargetBinding(for: category.id)
+                )
+            )
+            .onHover { hovering in
+                if hovering {
+                    categoryHoveredIDs.insert(category.id)
+                } else {
+                    categoryHoveredIDs.remove(category.id)
+                }
+            }
+        }
     }
 
     private func categoryChip(
         title: String,
-        color: Color,
         isSelected: Bool,
+        isDropHovered: Bool,
+        isPointerHovered: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(isSelected ? categoryChipSelectedTextColor : color)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(categoryChipTextColor(isSelected: isSelected, isDropHovered: isDropHovered))
                 .lineLimit(1)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, Layout.categoryChipHorizontalPadding)
                 .frame(height: Layout.categoryChipHeight)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(isSelected ? categoryChipSelectedBackgroundColor : categoryChipBackgroundColor)
+                        .fill(
+                            isDropHovered && isSelected == false
+                            ? categoryChipDropHoverBackgroundColor(isSelected: isSelected)
+                            : (
+                                isSelected
+                                ? categoryChipSelectedBackgroundColor
+                                : (isPointerHovered ? categoryChipPointerHoverBackgroundColor : Color.clear)
+                            )
+                        )
                 )
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(categoryChipStrokeColor, lineWidth: isSelected ? 0 : 1)
+                        .stroke(
+                            categoryChipBorderColor(
+                                isSelected: isSelected,
+                                isDropHovered: isDropHovered,
+                                isPointerHovered: isPointerHovered
+                            ),
+                            lineWidth: isSelected ? 0 : 1
+                        )
                 )
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.12), value: isDropHovered)
+        .animation(.easeInOut(duration: 0.12), value: isPointerHovered)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        }
+    }
+
+    private func categoryDropTargetBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { categoryDropTargetedIDs.contains(id) },
+            set: { isTargeted in
+                if isTargeted {
+                    categoryDropTargetedIDs.insert(id)
+                } else {
+                    categoryDropTargetedIDs.remove(id)
+                }
+            }
+        )
     }
 
     private var list: some View {
@@ -375,6 +530,7 @@ struct ContentView: View {
     }
 
     private func beginCategoryCreation(for taskID: UUID) {
+        cancelCategoryRename()
         pendingCategoryTaskID = taskID
         newCategoryName = ""
         activateWindow()
@@ -385,6 +541,13 @@ struct ContentView: View {
 
     private func confirmCategoryCreation() {
         guard let taskID = pendingCategoryTaskID else { return }
+        let trimmed = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else {
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
+                categoryShakeTrigger += 1
+            }
+            return
+        }
         guard let category = store.createCategory(name: newCategoryName) else { return }
         store.assignCategory(category.id, toTaskID: taskID)
         cancelCategoryCreation()
@@ -394,6 +557,37 @@ struct ContentView: View {
         newCategoryName = ""
         pendingCategoryTaskID = nil
         isCategoryInputFocused = false
+    }
+
+    private func beginCategoryRename(_ category: TaskCategory) {
+        cancelCategoryCreation()
+        editingCategoryID = category.id
+        categoryNameDraft = category.name
+        activateWindow()
+        DispatchQueue.main.async {
+            focusedCategoryID = category.id
+        }
+    }
+
+    private func commitCategoryRename(categoryID: UUID) {
+        store.renameCategory(id: categoryID, to: categoryNameDraft)
+        cancelCategoryRename()
+    }
+
+    private func cancelCategoryRename() {
+        categoryNameDraft = ""
+        editingCategoryID = nil
+        focusedCategoryID = nil
+    }
+
+    private func deleteCategory(_ categoryID: UUID) {
+        if selectedCategoryID == categoryID {
+            selectedCategoryID = nil
+        }
+        if editingCategoryID == categoryID {
+            cancelCategoryRename()
+        }
+        store.deleteCategory(id: categoryID)
     }
 
     @ViewBuilder
@@ -454,6 +648,10 @@ struct ContentView: View {
 }
 
 private extension ContentView {
+    var isCategoryCreationPresented: Bool {
+        pendingCategoryTaskID != nil
+    }
+
     var visibleTasks: [TaskItem] {
         let base = settings.showCompletedTasks
             ? store.activeTasks
@@ -508,11 +706,13 @@ private extension ContentView {
         return visibleTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
 
+    var shouldShowCategorySection: Bool {
+        store.categories.isEmpty == false
+    }
+
     var categorySectionHeight: CGFloat {
-        let createInputHeight = pendingCategoryTaskID == nil
-            ? 0
-            : (Layout.categoryInputTopSpacing + Layout.categoryInputHeight)
-        return Layout.inputToCategorySpacing + Layout.categoryBarHeight + createInputHeight
+        guard shouldShowCategorySection else { return 0 }
+        return Layout.inputToCategorySpacing + Layout.categoryBarHeight
     }
 
     var listContentHeight: CGFloat {
@@ -525,10 +725,6 @@ private extension ContentView {
         selectedCategoryID == nil
     }
 
-    var categoryChipBackgroundColor: Color {
-        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.04)
-    }
-
     var categoryChipSelectedBackgroundColor: Color {
         isDark ? Color.white : Theme.textPrimary
     }
@@ -539,6 +735,55 @@ private extension ContentView {
 
     var categoryChipStrokeColor: Color {
         isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.12)
+    }
+
+    func categoryChipDropHoverBackgroundColor(isSelected: Bool) -> Color {
+        if isSelected {
+            return isDark ? Color.white.opacity(0.42) : Color.white.opacity(0.88)
+        }
+        return isDark ? .white : .black
+    }
+
+    func categoryChipDropHoverStrokeColor(isSelected: Bool) -> Color {
+        if isSelected {
+            return isDark ? Color.white.opacity(0.50) : Color.black.opacity(0.20)
+        }
+        return Color.black
+    }
+
+    func categoryChipTextColor(isSelected: Bool, isDropHovered: Bool) -> Color {
+        if isDropHovered {
+            if isSelected {
+                return primaryTextColor
+            }
+            return isDark ? Theme.textPrimary : .white
+        }
+        return isSelected ? categoryChipSelectedTextColor : primaryTextColor
+    }
+
+    var categoryChipPointerHoverBackgroundColor: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
+
+    var categoryChipPointerHoverStrokeColor: Color {
+        isDark ? Color.white.opacity(0.28) : Color.black.opacity(0.18)
+    }
+
+    func categoryChipBorderColor(
+        isSelected: Bool,
+        isDropHovered: Bool,
+        isPointerHovered: Bool
+    ) -> Color {
+        if isSelected {
+            return .clear
+        }
+        if isDropHovered {
+            return categoryChipDropHoverStrokeColor(isSelected: isSelected)
+        }
+        if isPointerHovered {
+            return categoryChipPointerHoverStrokeColor
+        }
+        return categoryChipStrokeColor
     }
 
     func categoryBadge(for task: TaskItem) -> TaskCategoryBadge? {
@@ -649,11 +894,11 @@ private enum Layout {
     static let addButtonSpringDamping: CGFloat = 0.7
 
     static let inputToCategorySpacing: CGFloat = 12
-    static let categoryBarHeight: CGFloat = 34
-    static let categoryChipHeight: CGFloat = 34
-    static let categoryChipSpacing: CGFloat = 8
-    static let categoryInputTopSpacing: CGFloat = 8
-    static let categoryInputHeight: CGFloat = 34
+    static let categoryBarHeight: CGFloat = 28
+    static let categoryChipHeight: CGFloat = 28
+    static let categoryChipHorizontalPadding: CGFloat = 10
+    static let categoryChipSpacing: CGFloat = 6
+    static let categoryModalInputHeight: CGFloat = 44
 
     static let rowHeight: CGFloat = 48
     static let listRowSpacing: CGFloat = 10

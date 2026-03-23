@@ -97,6 +97,23 @@ final class TaskStore: ObservableObject {
         return category
     }
 
+    func renameCategory(id: UUID, to name: String) {
+        guard let trimmed = normalizedTitle(from: name) else { return }
+        guard let index = categories.firstIndex(where: { $0.id == id }) else { return }
+        let duplicateExists = categories.contains {
+            $0.id != id && $0.name.caseInsensitiveCompare(trimmed) == .orderedSame
+        }
+        guard duplicateExists == false else { return }
+        categories[index].name = trimmed
+    }
+
+    func deleteCategory(id: UUID) {
+        categories.removeAll { $0.id == id }
+        for index in tasks.indices where tasks[index].categoryID == id {
+            tasks[index].categoryID = nil
+        }
+    }
+
     func moveTask(from sourceId: UUID, to targetId: UUID) {
         guard sourceId != targetId else { return }
         guard let sourceIndex = tasks.firstIndex(where: { $0.id == sourceId }) else { return }
