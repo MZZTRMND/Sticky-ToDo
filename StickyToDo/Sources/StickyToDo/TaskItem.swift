@@ -7,6 +7,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var isInProgress: Bool
     var isDivider: Bool
     var isImportant: Bool
+    var categoryID: UUID?
     let createdAt: Date
 
     init(
@@ -16,6 +17,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         isInProgress: Bool = false,
         isDivider: Bool = false,
         isImportant: Bool = false,
+        categoryID: UUID? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -24,6 +26,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         self.isInProgress = isInProgress
         self.isDivider = isDivider
         self.isImportant = isImportant
+        self.categoryID = categoryID
         self.createdAt = createdAt
     }
 
@@ -34,6 +37,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         case isInProgress
         case isDivider
         case isImportant
+        case categoryID
         case createdAt
     }
 
@@ -45,6 +49,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         isInProgress = try container.decodeIfPresent(Bool.self, forKey: .isInProgress) ?? false
         isDivider = try container.decodeIfPresent(Bool.self, forKey: .isDivider) ?? false
         isImportant = try container.decodeIfPresent(Bool.self, forKey: .isImportant) ?? false
+        categoryID = try container.decodeIfPresent(UUID.self, forKey: .categoryID)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 
@@ -56,6 +61,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         try container.encode(isInProgress, forKey: .isInProgress)
         try container.encode(isDivider, forKey: .isDivider)
         try container.encode(isImportant, forKey: .isImportant)
+        try container.encodeIfPresent(categoryID, forKey: .categoryID)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }

@@ -14,9 +14,12 @@ struct ContentView: View {
     @State private var draggingId: UUID?
     @State private var isListHovered = false
     @State private var windowRef: NSWindow?
-    @State private var editingDividerId: UUID?
     @State private var editingTaskId: UUID?
+    @State private var selectedCategoryID: UUID?
+    @State private var pendingCategoryTaskID: UUID?
+    @State private var newCategoryName = ""
     @State private var placeholderIndex = 0
+    @FocusState private var isCategoryInputFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
     private let placeholderTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
 
@@ -37,6 +40,7 @@ struct ContentView: View {
                         header(dayNumber: dayNumber, date: date)
                         inputRow
                     }
+                    categorySection
                     if visibleTasks.isEmpty {
                         Color.clear
                             .frame(height: Layout.emptyStateBottomSpace)
@@ -216,10 +220,93 @@ struct ContentView: View {
         .modifier(ShakeEffect(animatableData: shakeTrigger))
     }
 
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: Layout.categoryInputTopSpacing) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Layout.categoryChipSpacing) {
+                    categoryChip(
+                        title: "All",
+                        color: primaryTextColor,
+                        isSelected: selectedCategoryID == nil
+                    ) {
+                        selectedCategoryID = nil
+                    }
+
+                    ForEach(store.categories) { category in
+                        categoryChip(
+                            title: category.name,
+                            color: Theme.color(fromHex: category.colorHex),
+                            isSelected: selectedCategoryID == category.id
+                        ) {
+                            selectedCategoryID = category.id
+                        }
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+            .frame(height: Layout.categoryBarHeight)
+
+            if pendingCategoryTaskID != nil {
+                categoryInputRow
+            }
+        }
+        .padding(.top, Layout.inputToCategorySpacing)
+    }
+
+    private var categoryInputRow: some View {
+        HStack(spacing: 8) {
+            TextField("New category", text: $newCategoryName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(primaryTextColor)
+                .padding(.horizontal, 12)
+                .frame(height: Layout.categoryInputHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.1), lineWidth: 1)
+                )
+                .focused($isCategoryInputFocused)
+                .onSubmit(confirmCategoryCreation)
+                .onExitCommand {
+                    cancelCategoryCreation()
+                }
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    private func categoryChip(
+        title: String,
+        color: Color,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(isSelected ? categoryChipSelectedTextColor : color)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(height: Layout.categoryChipHeight)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? categoryChipSelectedBackgroundColor : categoryChipBackgroundColor)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(categoryChipStrokeColor, lineWidth: isSelected ? 0 : 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(visibleTasks.enumerated()), id: \.element.id) { index, task in
+            LazyVStack(spacing: Layout.listRowSpacing) {
+                ForEach(visibleTasks) { task in
                     listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
@@ -230,19 +317,6 @@ struct ContentView: View {
                         .contextMenu {
                             rowContextMenu(for: task)
                         }
-
-                    if index < visibleTasks.count - 1 {
-                        Color.clear
-                            .frame(height: Layout.listRowSpacing)
-                            .contentShape(Rectangle())
-                            .contextMenu {
-                                Button("Add divider") {
-                                    addDivider(afterVisibleIndex: index)
-                                    activateWindow()
-                                    isInputFocused = true
-                                }
-                            }
-                    }
                 }
             }
             .padding(.top, Layout.listTopPadding)
@@ -258,21 +332,14 @@ struct ContentView: View {
 
     @ViewBuilder
     private func listItem(for task: TaskItem) -> some View {
-        if task.isDivider {
-            DividerRow(
-                title: task.title,
-                onRename: { store.updateTitle(for: task, title: $0) },
-                editTrigger: dividerEditBinding(for: task.id)
-            )
-        } else {
-            TaskRow(
-                task: task,
-                onToggle: { store.toggleDone(for: task) },
-                onDelete: { store.delete(task) },
-                onRename: { store.updateTitle(for: task, title: $0) },
-                editTrigger: taskEditBinding(for: task.id)
-            )
-        }
+        TaskRow(
+            task: task,
+            onToggle: { store.toggleDone(for: task) },
+            onDelete: { store.delete(task) },
+            onRename: { store.updateTitle(for: task, title: $0) },
+            categoryBadge: categoryBadge(for: task),
+            editTrigger: taskEditBinding(for: task.id)
+        )
     }
 
     private func addTask() {
@@ -283,19 +350,10 @@ struct ContentView: View {
             }
             return
         }
-        store.addTask(title: trimmed)
+        store.addTask(title: trimmed, categoryID: selectedCategoryID)
         newTaskText = ""
         isInputFocused = true
         activateWindow()
-    }
-
-    private func addDivider(afterVisibleIndex index: Int) {
-        let insertionVisibleIndex = index + 1
-        if insertionVisibleIndex < visibleTasks.count {
-            store.addDivider(above: visibleTasks[insertionVisibleIndex])
-        } else {
-            store.addDivider(at: store.tasks.count)
-        }
     }
 
     private func activateWindow() {
@@ -316,55 +374,68 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func rowContextMenu(for task: TaskItem) -> some View {
-        if task.isDivider {
-            Button("Edit name") {
-                editingDividerId = task.id
-                activateWindow()
-            }
-            Button("Add divider") {
-                store.addDivider(above: task)
-                activateWindow()
-                isInputFocused = true
-            }
-            Button("Delete divider") {
-                store.delete(task)
-            }
-        } else {
-            Button(task.isInProgress ? "Unmark in progress" : "Mark as in progress") {
-                store.setInProgress(task.isInProgress == false, for: task)
-            }
-            Divider()
-
-            Button(task.isImportant ? "Unmark as important" : "Mark as important") {
-                store.setImportant(task.isImportant == false, for: task)
-            }
-            Divider()
-
-            Button("Edit task") {
-                editingTaskId = task.id
-                activateWindow()
-            }
-            Button {
-                store.delete(task)
-            } label: {
-                Text("Delete task")
-            }
+    private func beginCategoryCreation(for taskID: UUID) {
+        pendingCategoryTaskID = taskID
+        newCategoryName = ""
+        activateWindow()
+        DispatchQueue.main.async {
+            isCategoryInputFocused = true
         }
     }
 
-    private func dividerEditBinding(for id: UUID) -> Binding<Bool> {
-        Binding(
-            get: { editingDividerId == id },
-            set: { isEditing in
-                if isEditing {
-                    editingDividerId = id
-                } else if editingDividerId == id {
-                    editingDividerId = nil
+    private func confirmCategoryCreation() {
+        guard let taskID = pendingCategoryTaskID else { return }
+        guard let category = store.createCategory(name: newCategoryName) else { return }
+        store.assignCategory(category.id, toTaskID: taskID)
+        cancelCategoryCreation()
+    }
+
+    private func cancelCategoryCreation() {
+        newCategoryName = ""
+        pendingCategoryTaskID = nil
+        isCategoryInputFocused = false
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(for task: TaskItem) -> some View {
+        Button(task.isInProgress ? "Unmark in progress" : "Mark as in progress") {
+            store.setInProgress(task.isInProgress == false, for: task)
+        }
+        Divider()
+
+        Button(task.isImportant ? "Unmark as important" : "Mark as important") {
+            store.setImportant(task.isImportant == false, for: task)
+        }
+        Divider()
+
+        Menu("Move to category") {
+            if store.categories.isEmpty {
+                Button("Create new category") {
+                    beginCategoryCreation(for: task.id)
+                }
+            } else {
+                ForEach(store.categories) { category in
+                    Button(category.name) {
+                        store.assignCategory(category.id, to: task)
+                    }
+                }
+                Divider()
+                Button("Create new category") {
+                    beginCategoryCreation(for: task.id)
                 }
             }
-        )
+        }
+        Divider()
+
+        Button("Edit task") {
+            editingTaskId = task.id
+            activateWindow()
+        }
+        Button {
+            store.delete(task)
+        } label: {
+            Text("Delete task")
+        }
     }
 
     private func taskEditBinding(for id: UUID) -> Binding<Bool> {
@@ -384,9 +455,12 @@ struct ContentView: View {
 
 private extension ContentView {
     var visibleTasks: [TaskItem] {
-        settings.showCompletedTasks
-            ? store.tasks
-            : store.tasks.filter { $0.isDivider || $0.isDone == false }
+        let base = settings.showCompletedTasks
+            ? store.activeTasks
+            : store.activeTasks.filter { $0.isDone == false }
+
+        guard let selectedCategoryID else { return base }
+        return base.filter { $0.categoryID == selectedCategoryID }
     }
 
     var isDark: Bool { colorScheme == .dark }
@@ -429,17 +503,51 @@ private extension ContentView {
             + Layout.headerHeight
             + Layout.inputHeight
             + Layout.headerToInputSpacing
+            + categorySectionHeight
             + listHeight
         return visibleTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
     }
 
+    var categorySectionHeight: CGFloat {
+        let createInputHeight = pendingCategoryTaskID == nil
+            ? 0
+            : (Layout.categoryInputTopSpacing + Layout.categoryInputHeight)
+        return Layout.inputToCategorySpacing + Layout.categoryBarHeight + createInputHeight
+    }
+
     var listContentHeight: CGFloat {
-        let rowHeights = visibleTasks.map { task -> CGFloat in
-            task.isDivider ? Layout.dividerRowHeight : Layout.rowHeight
-        }
-        let rowsHeight = rowHeights.reduce(0, +)
+        let rowsHeight = CGFloat(visibleTasks.count) * Layout.rowHeight
         let spacingHeight = CGFloat(max(0, visibleTasks.count - 1)) * Layout.listRowSpacing
         return rowsHeight + spacingHeight + Layout.listTopPadding + Layout.listBottomPadding
+    }
+
+    var showCategoryBadges: Bool {
+        selectedCategoryID == nil
+    }
+
+    var categoryChipBackgroundColor: Color {
+        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.04)
+    }
+
+    var categoryChipSelectedBackgroundColor: Color {
+        isDark ? Color.white : Theme.textPrimary
+    }
+
+    var categoryChipSelectedTextColor: Color {
+        isDark ? Theme.textPrimary : .white
+    }
+
+    var categoryChipStrokeColor: Color {
+        isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.12)
+    }
+
+    func categoryBadge(for task: TaskItem) -> TaskCategoryBadge? {
+        guard showCategoryBadges else { return nil }
+        guard let category = store.category(for: task.categoryID) else { return nil }
+        return TaskCategoryBadge(
+            name: category.name,
+            color: Theme.color(fromHex: category.colorHex)
+        )
     }
 
 
@@ -540,8 +648,14 @@ private enum Layout {
     static let addButtonSpringResponse: CGFloat = 0.28
     static let addButtonSpringDamping: CGFloat = 0.7
 
+    static let inputToCategorySpacing: CGFloat = 12
+    static let categoryBarHeight: CGFloat = 34
+    static let categoryChipHeight: CGFloat = 34
+    static let categoryChipSpacing: CGFloat = 8
+    static let categoryInputTopSpacing: CGFloat = 8
+    static let categoryInputHeight: CGFloat = 34
+
     static let rowHeight: CGFloat = 48
-    static let dividerRowHeight: CGFloat = 30
     static let listRowSpacing: CGFloat = 10
     static let listTopPadding: CGFloat = 16
     static let listBottomPadding: CGFloat = 16

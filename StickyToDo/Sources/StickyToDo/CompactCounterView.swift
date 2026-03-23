@@ -97,8 +97,7 @@ struct CompactCounterView: View {
     }
 
     private var visibleTasksForPreview: [TaskItem] {
-        let tasksOnly = store.tasks.filter { $0.isDivider == false }
-        return settings.showCompletedTasks ? tasksOnly : tasksOnly.filter { $0.isDone == false }
+        return settings.showCompletedTasks ? store.activeTasks : store.activeTasks.filter { $0.isDone == false }
     }
 
     private var taskPreview: [TaskItem] {

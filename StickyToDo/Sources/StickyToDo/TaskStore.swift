@@ -5,38 +5,38 @@ final class TaskStore: ObservableObject {
         didSet {
             updateDerivedState()
             guard isLoading == false else { return }
-            save()
+            saveTasks()
         }
     }
+
+    @Published var categories: [TaskCategory] = [] {
+        didSet {
+            guard isLoading == false else { return }
+            saveCategories()
+        }
+    }
+
     @Published private(set) var taskCount: Int = 0
     @Published private(set) var completedTaskCount: Int = 0
 
-    private let storageKey = "StickyToDo.tasks"
+    private let taskStorageKey = "StickyToDo.tasks"
+    private let categoryStorageKey = "StickyToDo.categories"
     private var isLoading = false
-    private var lastSavedData: Data?
+    private var lastSavedTaskData: Data?
+    private var lastSavedCategoryData: Data?
 
     init() {
         load()
         updateDerivedState()
     }
 
-    func addTask(title: String) {
+    var activeTasks: [TaskItem] {
+        tasks.filter { $0.isDivider == false }
+    }
+
+    func addTask(title: String, categoryID: UUID? = nil) {
         guard let trimmed = normalizedTitle(from: title) else { return }
-        tasks.insert(TaskItem(title: trimmed), at: 0)
-    }
-
-    func addDivider(title: String = "New section") {
-        tasks.insert(TaskItem(title: title, isDivider: true), at: 0)
-    }
-
-    func addDivider(above task: TaskItem, title: String = "New section") {
-        guard let index = indexOfTask(task) else { return }
-        tasks.insert(TaskItem(title: title, isDivider: true), at: index)
-    }
-
-    func addDivider(at index: Int, title: String = "New section") {
-        let safeIndex = max(0, min(index, tasks.count))
-        tasks.insert(TaskItem(title: title, isDivider: true), at: safeIndex)
+        tasks.insert(TaskItem(title: trimmed, categoryID: categoryID), at: 0)
     }
 
     func toggleDone(for task: TaskItem) {
@@ -70,6 +70,33 @@ final class TaskStore: ObservableObject {
         }
     }
 
+    func assignCategory(_ categoryID: UUID?, to task: TaskItem) {
+        guard let index = indexOfTask(task) else { return }
+        tasks[index].categoryID = categoryID
+    }
+
+    func assignCategory(_ categoryID: UUID?, toTaskID taskID: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        tasks[index].categoryID = categoryID
+    }
+
+    func category(for id: UUID?) -> TaskCategory? {
+        guard let id else { return nil }
+        return categories.first { $0.id == id }
+    }
+
+    @discardableResult
+    func createCategory(name: String) -> TaskCategory? {
+        guard let trimmed = normalizedTitle(from: name) else { return nil }
+        if let existing = categories.first(where: { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return existing
+        }
+        let colorHex = Theme.categoryPalette[categories.count % Theme.categoryPalette.count]
+        let category = TaskCategory(name: trimmed, colorHex: colorHex)
+        categories.append(category)
+        return category
+    }
+
     func moveTask(from sourceId: UUID, to targetId: UUID) {
         guard sourceId != targetId else { return }
         guard let sourceIndex = tasks.firstIndex(where: { $0.id == sourceId }) else { return }
@@ -80,27 +107,62 @@ final class TaskStore: ObservableObject {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
         isLoading = true
         defer { isLoading = false }
-        do {
-            let decoded = try JSONDecoder().decode([TaskItem].self, from: data)
-            tasks = decoded
-            lastSavedData = data
-        } catch {
+
+        if let data = UserDefaults.standard.data(forKey: taskStorageKey) {
+            do {
+                let decoded = try JSONDecoder().decode([TaskItem].self, from: data)
+                tasks = decoded.filter { $0.isDivider == false }
+            } catch {
+                tasks = []
+            }
+        } else {
             tasks = []
-            lastSavedData = nil
+        }
+
+        if let data = UserDefaults.standard.data(forKey: categoryStorageKey) {
+            do {
+                categories = try JSONDecoder().decode([TaskCategory].self, from: data)
+            } catch {
+                categories = []
+            }
+        } else {
+            categories = []
+        }
+
+        // Ensure old references to removed categories are cleaned up.
+        let existingCategoryIDs = Set(categories.map(\.id))
+        for index in tasks.indices where tasks[index].categoryID != nil {
+            guard let categoryID = tasks[index].categoryID else { continue }
+            if existingCategoryIDs.contains(categoryID) == false {
+                tasks[index].categoryID = nil
+            }
+        }
+
+        lastSavedTaskData = try? JSONEncoder().encode(tasks)
+        lastSavedCategoryData = try? JSONEncoder().encode(categories)
+    }
+
+    private func saveTasks() {
+        do {
+            let data = try JSONEncoder().encode(tasks)
+            guard data != lastSavedTaskData else { return }
+            UserDefaults.standard.set(data, forKey: taskStorageKey)
+            lastSavedTaskData = data
+        } catch {
+            // Keep running without crashing.
         }
     }
 
-    private func save() {
+    private func saveCategories() {
         do {
-            let data = try JSONEncoder().encode(tasks)
-            guard data != lastSavedData else { return }
-            UserDefaults.standard.set(data, forKey: storageKey)
-            lastSavedData = data
+            let data = try JSONEncoder().encode(categories)
+            guard data != lastSavedCategoryData else { return }
+            UserDefaults.standard.set(data, forKey: categoryStorageKey)
+            lastSavedCategoryData = data
         } catch {
-            // If save fails, keep running without crashing.
+            // Keep running without crashing.
         }
     }
 
@@ -120,8 +182,6 @@ final class TaskStore: ObservableObject {
             completedTaskCount = completed
         }
     }
-
-    // MARK: - Helpers
 
     private func normalizedTitle(from raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
