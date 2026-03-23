@@ -263,7 +263,7 @@ struct TaskRow: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.black.opacity(0.88) : Color.white)
+                    .fill(colorScheme == .dark ? Theme.darkBase.opacity(0.88) : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(

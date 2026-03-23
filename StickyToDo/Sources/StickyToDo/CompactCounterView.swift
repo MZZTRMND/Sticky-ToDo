@@ -13,11 +13,7 @@ struct CompactCounterView: View {
         let showsOverflowIndicator = hasMoreTasks
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                        .fill(isDark ? Color.black.opacity(0.80) : Color.white.opacity(0.80))
-                )
+                .fill(isDark ? Theme.darkBase : Theme.lightCard)
 
             VStack(alignment: .leading, spacing: Layout.taskSpacing) {
                 Text(compactDateTitle)
