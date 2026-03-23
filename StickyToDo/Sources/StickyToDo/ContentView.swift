@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
+    @State private var isDragCursorActive = false
     @State private var isListHovered = false
     @State private var windowRef: NSWindow?
     @State private var editingTaskId: UUID?
@@ -21,8 +22,11 @@ struct ContentView: View {
     @State private var isAllCategoryDropTargeted = false
     @State private var categoryDropTargetedIDs: Set<UUID> = []
     @State private var isAllCategoryHovered = false
+    @State private var isCategorySectionHovered = false
+    @State private var isAddCategoryHovered = false
     @State private var categoryHoveredIDs: Set<UUID> = []
     @State private var categoryNameDraft = ""
+    @State private var isCategoryCreationPresented = false
     @State private var pendingCategoryTaskID: UUID?
     @State private var newCategoryName = ""
     @State private var placeholderIndex = 0
@@ -91,6 +95,11 @@ struct ContentView: View {
         }
         .onChange(of: isListHovered) { _ in
             updateWindowDragBehavior()
+        }
+        .onChange(of: draggingId) { value in
+            if value == nil {
+                endDragCursor()
+            }
         }
         .onReceive(placeholderTimer) { _ in
             rotatePlaceholderIfNeeded()
@@ -266,11 +275,53 @@ struct ContentView: View {
                 ForEach(store.categories) { category in
                     categoryChipView(for: category)
                 }
+
+                if isCategorySectionHovered {
+                    addCategoryChip
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
             }
             .padding(.horizontal, 1)
+            .padding(.vertical, 1)
         }
+        .clipped()
         .frame(height: Layout.categoryBarHeight)
         .padding(.top, Layout.inputToCategorySpacing)
+        .onHover { hovering in
+            isCategorySectionHovered = hovering
+        }
+    }
+
+    private var addCategoryChip: some View {
+        Button {
+            beginCategoryCreation(for: nil)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(primaryTextColor)
+                .frame(width: Layout.categoryChipHeight, height: Layout.categoryChipHeight)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isAddCategoryHovered ? categoryChipPointerHoverBackgroundColor : Color.clear)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(
+                            isAddCategoryHovered ? categoryChipPointerHoverStrokeColor : categoryChipStrokeColor,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.12), value: isAddCategoryHovered)
+        .onHover { hovering in
+            isAddCategoryHovered = hovering
+            if hovering {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        }
     }
 
     private var categoryCreationOverlay: some View {
@@ -461,6 +512,7 @@ struct ContentView: View {
                     listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
+                            beginDragCursor()
                             draggingId = task.id
                             return NSItemProvider(object: task.id.uuidString as NSString)
                         }
@@ -478,6 +530,9 @@ struct ContentView: View {
         .frame(maxHeight: Layout.listMaxHeight)
         .onHover { hovering in
             isListHovered = hovering
+        }
+        .onDisappear {
+            endDragCursor()
         }
     }
 
@@ -519,16 +574,16 @@ struct ContentView: View {
 
     private func rotatePlaceholderIfNeeded() {
         guard newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard isInputFocused == false else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             placeholderIndex = (placeholderIndex + 1) % Layout.rotatingPlaceholders.count
         }
     }
 
-    private func beginCategoryCreation(for taskID: UUID) {
+    private func beginCategoryCreation(for taskID: UUID?) {
         cancelCategoryRename()
         pendingCategoryTaskID = taskID
         newCategoryName = ""
+        isCategoryCreationPresented = true
         activateWindow()
         DispatchQueue.main.async {
             isCategoryInputFocused = true
@@ -536,7 +591,6 @@ struct ContentView: View {
     }
 
     private func confirmCategoryCreation() {
-        guard let taskID = pendingCategoryTaskID else { return }
         let trimmed = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
@@ -545,14 +599,31 @@ struct ContentView: View {
             return
         }
         guard let category = store.createCategory(name: newCategoryName) else { return }
-        store.assignCategory(category.id, toTaskID: taskID)
+        if let taskID = pendingCategoryTaskID {
+            store.assignCategory(category.id, toTaskID: taskID)
+        } else {
+            selectedCategoryID = category.id
+        }
         cancelCategoryCreation()
     }
 
     private func cancelCategoryCreation() {
         newCategoryName = ""
         pendingCategoryTaskID = nil
+        isCategoryCreationPresented = false
         isCategoryInputFocused = false
+    }
+
+    private func beginDragCursor() {
+        guard isDragCursorActive == false else { return }
+        NSCursor.closedHand.push()
+        isDragCursorActive = true
+    }
+
+    private func endDragCursor() {
+        guard isDragCursorActive else { return }
+        NSCursor.pop()
+        isDragCursorActive = false
     }
 
     private func beginCategoryRename(_ category: TaskCategory) {
@@ -644,10 +715,6 @@ struct ContentView: View {
 }
 
 private extension ContentView {
-    var isCategoryCreationPresented: Bool {
-        pendingCategoryTaskID != nil
-    }
-
     var visibleTasks: [TaskItem] {
         let base = settings.showCompletedTasks
             ? store.activeTasks
@@ -886,7 +953,7 @@ private enum Layout {
     static let addButtonSpringDamping: CGFloat = 0.7
 
     static let inputToCategorySpacing: CGFloat = 12
-    static let categoryBarHeight: CGFloat = 28
+    static let categoryBarHeight: CGFloat = 30
     static let categoryChipHeight: CGFloat = 28
     static let categoryChipHorizontalPadding: CGFloat = 10
     static let categoryChipSpacing: CGFloat = 6
