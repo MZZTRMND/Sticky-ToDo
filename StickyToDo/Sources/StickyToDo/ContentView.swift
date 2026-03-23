@@ -466,14 +466,13 @@ private extension ContentView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(isDark ? Color.black.opacity(0.88) : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isDark ? Color.clear : Color.white.opacity(0.80))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(cardBorderColor, lineWidth: 1)
+                        .stroke(
+                            isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                            lineWidth: 1
+                        )
                 )
         )
         .shadow(color: Color.black.opacity(isDark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
