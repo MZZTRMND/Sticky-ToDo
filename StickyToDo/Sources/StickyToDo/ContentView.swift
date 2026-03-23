@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
+    @State private var isDragCursorActive = false
     @State private var isListHovered = false
     @State private var windowRef: NSWindow?
     @State private var editingTaskId: UUID?
@@ -21,8 +22,11 @@ struct ContentView: View {
     @State private var isAllCategoryDropTargeted = false
     @State private var categoryDropTargetedIDs: Set<UUID> = []
     @State private var isAllCategoryHovered = false
+    @State private var isCategorySectionHovered = false
+    @State private var isAddCategoryHovered = false
     @State private var categoryHoveredIDs: Set<UUID> = []
     @State private var categoryNameDraft = ""
+    @State private var isCategoryCreationPresented = false
     @State private var pendingCategoryTaskID: UUID?
     @State private var newCategoryName = ""
     @State private var placeholderIndex = 0
@@ -31,7 +35,7 @@ struct ContentView: View {
     @FocusState private var isCategoryInputFocused: Bool
     @FocusState private var focusedCategoryID: UUID?
     @Environment(\.colorScheme) private var colorScheme
-    private let placeholderTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
+    private let placeholderTimer = Timer.publish(every: 5.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let date = Date.now
@@ -44,16 +48,20 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     VStack(spacing: Layout.headerToInputSpacing) {
                         header(dayNumber: dayNumber, date: date)
+                            .padding(.top, Layout.headerSectionTopPadding)
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                         inputRow
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                     }
                     if shouldShowCategorySection {
                         categorySection
                     }
                     if visibleTasks.isEmpty {
-                        Color.clear
+                        emptyStateView
                             .frame(height: Layout.emptyStateBottomSpace)
                     } else {
                         list
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                     }
                 }
                 .padding(.top, Layout.cardTopPadding)
@@ -92,6 +100,11 @@ struct ContentView: View {
         .onChange(of: isListHovered) { _ in
             updateWindowDragBehavior()
         }
+        .onChange(of: draggingId) { value in
+            if value == nil {
+                endDragCursor()
+            }
+        }
         .onReceive(placeholderTimer) { _ in
             rotatePlaceholderIfNeeded()
         }
@@ -100,6 +113,23 @@ struct ContentView: View {
                 self.selectedCategoryID = nil
             }
         }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 10) {
+            VStack(spacing: 2) {
+                Text(Layout.emptyStateMessage.line1)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(placeholderTextColor)
+                    .multilineTextAlignment(.center)
+
+                Text(Layout.emptyStateMessage.line2)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(placeholderTextColor)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func header(dayNumber: Int, date: Date) -> some View {
@@ -266,11 +296,71 @@ struct ContentView: View {
                 ForEach(store.categories) { category in
                     categoryChipView(for: category)
                 }
+
+                if isCategorySectionHovered {
+                    addCategoryChip
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
             }
-            .padding(.horizontal, 1)
+            .padding(.horizontal, Layout.sectionHorizontalPadding + 1)
+            .padding(.vertical, 1)
         }
+        .clipped()
         .frame(height: Layout.categoryBarHeight)
         .padding(.top, Layout.inputToCategorySpacing)
+        .onHover { hovering in
+            isCategorySectionHovered = hovering
+        }
+        .overlay(alignment: .leading) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: Layout.categoryEdgeFadeWidth)
+            .allowsHitTesting(false)
+        }
+        .overlay(alignment: .trailing) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .trailing,
+                endPoint: .leading
+            )
+            .frame(width: Layout.categoryEdgeFadeWidth)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var addCategoryChip: some View {
+        Button {
+            beginCategoryCreation(for: nil)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(primaryTextColor)
+                .frame(width: Layout.categoryChipHeight, height: Layout.categoryChipHeight)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isAddCategoryHovered ? categoryChipPointerHoverBackgroundColor : Color.clear)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(
+                            isAddCategoryHovered ? categoryChipPointerHoverStrokeColor : categoryChipStrokeColor,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.12), value: isAddCategoryHovered)
+        .onHover { hovering in
+            isAddCategoryHovered = hovering
+            if hovering {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        }
     }
 
     private var categoryCreationOverlay: some View {
@@ -461,6 +551,7 @@ struct ContentView: View {
                     listItem(for: task)
                         .opacity(draggingId == task.id ? 0.4 : 1.0)
                         .onDrag {
+                            beginDragCursor()
                             draggingId = task.id
                             return NSItemProvider(object: task.id.uuidString as NSString)
                         }
@@ -476,8 +567,20 @@ struct ContentView: View {
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
         .frame(maxHeight: Layout.listMaxHeight)
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: Layout.listTopFadeHeight)
+            .allowsHitTesting(false)
+        }
         .onHover { hovering in
             isListHovered = hovering
+        }
+        .onDisappear {
+            endDragCursor()
         }
     }
 
@@ -519,16 +622,16 @@ struct ContentView: View {
 
     private func rotatePlaceholderIfNeeded() {
         guard newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard isInputFocused == false else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             placeholderIndex = (placeholderIndex + 1) % Layout.rotatingPlaceholders.count
         }
     }
 
-    private func beginCategoryCreation(for taskID: UUID) {
+    private func beginCategoryCreation(for taskID: UUID?) {
         cancelCategoryRename()
         pendingCategoryTaskID = taskID
         newCategoryName = ""
+        isCategoryCreationPresented = true
         activateWindow()
         DispatchQueue.main.async {
             isCategoryInputFocused = true
@@ -536,7 +639,6 @@ struct ContentView: View {
     }
 
     private func confirmCategoryCreation() {
-        guard let taskID = pendingCategoryTaskID else { return }
         let trimmed = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else {
             withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
@@ -545,14 +647,31 @@ struct ContentView: View {
             return
         }
         guard let category = store.createCategory(name: newCategoryName) else { return }
-        store.assignCategory(category.id, toTaskID: taskID)
+        if let taskID = pendingCategoryTaskID {
+            store.assignCategory(category.id, toTaskID: taskID)
+        } else {
+            selectedCategoryID = category.id
+        }
         cancelCategoryCreation()
     }
 
     private func cancelCategoryCreation() {
         newCategoryName = ""
         pendingCategoryTaskID = nil
+        isCategoryCreationPresented = false
         isCategoryInputFocused = false
+    }
+
+    private func beginDragCursor() {
+        guard isDragCursorActive == false else { return }
+        NSCursor.closedHand.push()
+        isDragCursorActive = true
+    }
+
+    private func endDragCursor() {
+        guard isDragCursorActive else { return }
+        NSCursor.pop()
+        isDragCursorActive = false
     }
 
     private func beginCategoryRename(_ category: TaskCategory) {
@@ -644,10 +763,6 @@ struct ContentView: View {
 }
 
 private extension ContentView {
-    var isCategoryCreationPresented: Bool {
-        pendingCategoryTaskID != nil
-    }
-
     var visibleTasks: [TaskItem] {
         let base = settings.showCompletedTasks
             ? store.activeTasks
@@ -690,6 +805,7 @@ private extension ContentView {
             ? Layout.emptyStateBottomSpace
             : listContentHeight
         let dynamicHeight = Layout.cardTopPadding
+            + Layout.headerSectionTopPadding
             + Layout.headerHeight
             + Layout.inputHeight
             + Layout.headerToInputSpacing
@@ -828,7 +944,7 @@ private extension ContentView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDark ? Theme.darkBase.opacity(0.88) : Color.white)
+                .fill(isDark ? Theme.darkBase : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(
@@ -846,8 +962,10 @@ private extension ContentView {
 private enum Layout {
     static let cardCornerRadius: CGFloat = 40
     static let cardWidth: CGFloat = 350
-    static let cardTopPadding: CGFloat = 16
-    static let cardPadding: CGFloat = 16
+    static let cardTopPadding: CGFloat = 0
+    static let cardPadding: CGFloat = 0
+    static let sectionHorizontalPadding: CGFloat = 16
+    static let headerSectionTopPadding: CGFloat = 16
 
     static let maxHeight: CGFloat = 600
 
@@ -886,16 +1004,30 @@ private enum Layout {
     static let addButtonSpringDamping: CGFloat = 0.7
 
     static let inputToCategorySpacing: CGFloat = 12
-    static let categoryBarHeight: CGFloat = 28
+    static let categoryBarHeight: CGFloat = 30
     static let categoryChipHeight: CGFloat = 28
     static let categoryChipHorizontalPadding: CGFloat = 10
     static let categoryChipSpacing: CGFloat = 6
+    static let categoryEdgeFadeWidth: CGFloat = 18
     static let categoryModalInputHeight: CGFloat = 44
 
     static let rowHeight: CGFloat = 48
-    static let listRowSpacing: CGFloat = 10
+    static let listRowSpacing: CGFloat = 8
     static let listTopPadding: CGFloat = 16
     static let listBottomPadding: CGFloat = 16
     static let listMaxHeight: CGFloat = 600
-    static let emptyStateBottomSpace: CGFloat = 20
+    static let listTopFadeHeight: CGFloat = 20
+    static let emptyStateBottomSpace: CGFloat = 100
+
+    static let emptyStateMessage = EmptyStateMessage(
+        title: "All clear.",
+        line1: "Nothing on your plate today.",
+        line2: "Add something or enjoy the quiet."
+    )
+}
+
+private struct EmptyStateMessage {
+    let title: String
+    let line1: String
+    let line2: String
 }
