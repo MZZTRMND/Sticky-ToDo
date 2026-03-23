@@ -3,7 +3,7 @@ import AppKit
 
 struct CompactCounterView: View {
     @EnvironmentObject private var store: TaskStore
-    @EnvironmentObject private var settings: AppSettings
+    @Environment(\.colorScheme) private var colorScheme
     let onExpand: () -> Void
     @State private var hasAppeared = false
 
@@ -56,14 +56,7 @@ struct CompactCounterView: View {
     }
 
     private var isDark: Bool {
-        switch settings.appearance {
-        case .dark:
-            return true
-        case .light:
-            return false
-        case .system:
-            return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        }
+        colorScheme == .dark
     }
 
     private var numberColor: Color {
