@@ -39,11 +39,7 @@ struct ContentView: View {
         ZStack(alignment: .topTrailing) {
             ZStack {
                 RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
-                    .fill(.regularMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
-                            .fill(cardGlassTint)
-                    )
+                    .fill(cardBackgroundColor)
 
                 VStack(spacing: 0) {
                     VStack(spacing: Layout.headerToInputSpacing) {
@@ -279,7 +275,7 @@ struct ContentView: View {
 
     private var categoryCreationOverlay: some View {
         ZStack {
-            Color.black.opacity(isCategoryModalAnimatingIn ? 0.30 : 0.0)
+            Color.black.opacity(isCategoryModalAnimatingIn ? 0.40 : 0.0)
                 .onTapGesture {
                     cancelCategoryCreation()
                 }
@@ -299,7 +295,7 @@ struct ContentView: View {
                                     .fill(.regularMaterial)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .fill(Color.black.opacity(0.35))
+                                            .fill(Theme.darkBase.opacity(0.35))
                                     )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -671,12 +667,8 @@ private extension ContentView {
         isDark ? Color.white.opacity(0.4) : Theme.placeholder
     }
 
-    var cardGlassTint: Color {
-        isDark ? Color.black.opacity(0.80) : Color.white.opacity(0.80)
-    }
-
-    var cardBorderColor: Color {
-        isDark ? Theme.glassBorderDark : Theme.glassBorderLight
+    var cardBackgroundColor: Color {
+        isDark ? Theme.darkBase : Theme.lightCard
     }
 
     var inputBackground: some View {
@@ -748,7 +740,7 @@ private extension ContentView {
         if isSelected {
             return isDark ? Color.white.opacity(0.50) : Color.black.opacity(0.20)
         }
-        return Color.black
+        return Theme.textPrimary
     }
 
     func categoryChipTextColor(isSelected: Bool, isDropHovered: Bool) -> Color {
@@ -836,7 +828,7 @@ private extension ContentView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDark ? Color.black.opacity(0.88) : Color.white)
+                .fill(isDark ? Theme.darkBase.opacity(0.88) : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(
