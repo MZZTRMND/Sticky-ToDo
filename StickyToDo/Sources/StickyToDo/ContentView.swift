@@ -35,7 +35,7 @@ struct ContentView: View {
     @FocusState private var isCategoryInputFocused: Bool
     @FocusState private var focusedCategoryID: UUID?
     @Environment(\.colorScheme) private var colorScheme
-    private let placeholderTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
+    private let placeholderTimer = Timer.publish(every: 5.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let date = Date.now
@@ -48,16 +48,20 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     VStack(spacing: Layout.headerToInputSpacing) {
                         header(dayNumber: dayNumber, date: date)
+                            .padding(.top, Layout.headerSectionTopPadding)
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                         inputRow
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                     }
                     if shouldShowCategorySection {
                         categorySection
                     }
                     if visibleTasks.isEmpty {
-                        Color.clear
+                        emptyStateView
                             .frame(height: Layout.emptyStateBottomSpace)
                     } else {
                         list
+                            .padding(.horizontal, Layout.sectionHorizontalPadding)
                     }
                 }
                 .padding(.top, Layout.cardTopPadding)
@@ -109,6 +113,23 @@ struct ContentView: View {
                 self.selectedCategoryID = nil
             }
         }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 10) {
+            VStack(spacing: 2) {
+                Text(Layout.emptyStateMessage.line1)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(placeholderTextColor)
+                    .multilineTextAlignment(.center)
+
+                Text(Layout.emptyStateMessage.line2)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(placeholderTextColor)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func header(dayNumber: Int, date: Date) -> some View {
@@ -281,7 +302,7 @@ struct ContentView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
             }
-            .padding(.horizontal, 1)
+            .padding(.horizontal, Layout.sectionHorizontalPadding + 1)
             .padding(.vertical, 1)
         }
         .clipped()
@@ -289,6 +310,24 @@ struct ContentView: View {
         .padding(.top, Layout.inputToCategorySpacing)
         .onHover { hovering in
             isCategorySectionHovered = hovering
+        }
+        .overlay(alignment: .leading) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: Layout.categoryEdgeFadeWidth)
+            .allowsHitTesting(false)
+        }
+        .overlay(alignment: .trailing) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .trailing,
+                endPoint: .leading
+            )
+            .frame(width: Layout.categoryEdgeFadeWidth)
+            .allowsHitTesting(false)
         }
     }
 
@@ -528,6 +567,15 @@ struct ContentView: View {
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
         .frame(maxHeight: Layout.listMaxHeight)
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: Layout.listTopFadeHeight)
+            .allowsHitTesting(false)
+        }
         .onHover { hovering in
             isListHovered = hovering
         }
@@ -757,6 +805,7 @@ private extension ContentView {
             ? Layout.emptyStateBottomSpace
             : listContentHeight
         let dynamicHeight = Layout.cardTopPadding
+            + Layout.headerSectionTopPadding
             + Layout.headerHeight
             + Layout.inputHeight
             + Layout.headerToInputSpacing
@@ -895,7 +944,7 @@ private extension ContentView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDark ? Theme.darkBase.opacity(0.88) : Color.white)
+                .fill(isDark ? Theme.darkBase : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(
@@ -913,8 +962,10 @@ private extension ContentView {
 private enum Layout {
     static let cardCornerRadius: CGFloat = 40
     static let cardWidth: CGFloat = 350
-    static let cardTopPadding: CGFloat = 16
-    static let cardPadding: CGFloat = 16
+    static let cardTopPadding: CGFloat = 0
+    static let cardPadding: CGFloat = 0
+    static let sectionHorizontalPadding: CGFloat = 16
+    static let headerSectionTopPadding: CGFloat = 16
 
     static let maxHeight: CGFloat = 600
 
@@ -957,12 +1008,26 @@ private enum Layout {
     static let categoryChipHeight: CGFloat = 28
     static let categoryChipHorizontalPadding: CGFloat = 10
     static let categoryChipSpacing: CGFloat = 6
+    static let categoryEdgeFadeWidth: CGFloat = 18
     static let categoryModalInputHeight: CGFloat = 44
 
     static let rowHeight: CGFloat = 48
-    static let listRowSpacing: CGFloat = 10
+    static let listRowSpacing: CGFloat = 8
     static let listTopPadding: CGFloat = 16
     static let listBottomPadding: CGFloat = 16
     static let listMaxHeight: CGFloat = 600
-    static let emptyStateBottomSpace: CGFloat = 20
+    static let listTopFadeHeight: CGFloat = 20
+    static let emptyStateBottomSpace: CGFloat = 100
+
+    static let emptyStateMessage = EmptyStateMessage(
+        title: "All clear.",
+        line1: "Nothing on your plate today.",
+        line2: "Add something or enjoy the quiet."
+    )
+}
+
+private struct EmptyStateMessage {
+    let title: String
+    let line1: String
+    let line2: String
 }
