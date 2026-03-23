@@ -16,7 +16,9 @@ struct ContentView: View {
     @State private var windowRef: NSWindow?
     @State private var editingDividerId: UUID?
     @State private var editingTaskId: UUID?
+    @State private var placeholderIndex = 0
     @Environment(\.colorScheme) private var colorScheme
+    private let placeholderTimer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let date = Date.now
@@ -71,6 +73,9 @@ struct ContentView: View {
         }
         .onChange(of: isListHovered) { _ in
             updateWindowDragBehavior()
+        }
+        .onReceive(placeholderTimer) { _ in
+            rotatePlaceholderIfNeeded()
         }
     }
 
@@ -149,9 +154,12 @@ struct ContentView: View {
             HStack {
                 ZStack(alignment: .leading) {
                     if newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Add today's task")
+                        Text(Layout.rotatingPlaceholders[placeholderIndex])
+                            .id(placeholderIndex)
                             .font(.system(size: Layout.inputFontSize, weight: .regular))
                             .foregroundStyle(placeholderTextColor)
+                            .transition(.opacity)
+                            .animation(.easeInOut(duration: 0.25), value: placeholderIndex)
                     }
 
                     TextField("", text: $newTaskText)
@@ -298,6 +306,14 @@ struct ContentView: View {
 
     private func updateWindowDragBehavior() {
         windowRef?.isMovableByWindowBackground = !isListHovered
+    }
+
+    private func rotatePlaceholderIfNeeded() {
+        guard newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard isInputFocused == false else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            placeholderIndex = (placeholderIndex + 1) % Layout.rotatingPlaceholders.count
+        }
     }
 
     @ViewBuilder
@@ -509,6 +525,12 @@ private enum Layout {
     static let inputCornerRadius: CGFloat = 100
     static let inputFontSize: CGFloat = 18
     static let inputTextLeading: CGFloat = 24
+    static let rotatingPlaceholders: [String] = [
+        "Add today's task",
+        "What do you want to do today?",
+        "What's on your mind?",
+        "Make today count…"
+    ]
 
     static let addButtonWidth: CGFloat = 40
     static let addButtonHeight: CGFloat = 40
