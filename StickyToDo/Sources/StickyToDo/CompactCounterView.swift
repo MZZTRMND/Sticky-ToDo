@@ -24,7 +24,7 @@ struct CompactCounterView: View {
                     .font(.system(size: Layout.headerFontSize, weight: .bold))
                     .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
-                    .frame(height: Layout.headerLineHeight, alignment: .leading)
+                .frame(height: Layout.headerLineHeight, alignment: .center)
 
                 VStack(alignment: .leading, spacing: Layout.taskSpacing) {
                     ForEach(taskPreview) { task in
@@ -42,6 +42,7 @@ struct CompactCounterView: View {
                             .font(.system(size: Layout.taskFontSize, weight: .regular))
                             .foregroundStyle(primaryTextColor.opacity(0.7))
                             .lineLimit(1)
+                            .padding(.top, Layout.overflowTopOffset)
                             .frame(height: Layout.overflowLineHeight, alignment: .leading)
                     }
                 }
@@ -52,6 +53,8 @@ struct CompactCounterView: View {
             .padding(.vertical, Layout.verticalPadding)
         }
         .frame(width: Layout.width, height: Layout.height(previewCount: previewCount, showsOverflowIndicator: showsOverflowIndicator))
+        .compositingGroup()
+        .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous))
         .scaleEffect(hasAppeared ? 1.0 : 0.92)
         .opacity(hasAppeared ? 1.0 : 0.0)
@@ -118,6 +121,7 @@ private enum Layout {
     static let taskFontSize: CGFloat = 16
     static let taskLineHeight: CGFloat = 24
     static let taskSpacing: CGFloat = 2
+    static let overflowTopOffset: CGFloat = -6
     static let overflowLineHeight: CGFloat = 14
     static let maxPreviewTasks: Int = 3
 
