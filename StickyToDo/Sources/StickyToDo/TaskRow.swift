@@ -6,6 +6,7 @@ struct TaskRow: View {
     let onToggle: () -> Void
     let onDelete: () -> Void
     let onRename: (String) -> Void
+    let categoryBadge: TaskCategoryBadge?
     @Binding var editTrigger: Bool
     @State private var isCircleHovered = false
     @State private var isTrashHovered = false
@@ -93,12 +94,37 @@ struct TaskRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
-            HStack(spacing: 12) {
-                if task.isImportant {
-                    Circle()
-                        .fill(Theme.accentOrange)
-                        .frame(width: 8, height: 8)
+            ZStack(alignment: .trailing) {
+                HStack(spacing: 10) {
+                    if task.isImportant {
+                        Circle()
+                            .fill(Theme.accentOrange)
+                            .frame(width: 8, height: 8)
+                    }
+
+                    if let categoryBadge {
+                        Text(categoryBadge.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(categoryBadge.color)
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(categoryBadge.color.opacity(colorScheme == .dark ? 0.22 : 0.18))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .stroke(
+                                                categoryBadge.color.opacity(colorScheme == .dark ? 0.34 : 0.26),
+                                                lineWidth: 1
+                                            )
+                                    )
+                            )
+                            .help(categoryBadge.name)
+                    }
                 }
+                .opacity(isRowHovered ? 0 : 1)
+                .animation(.easeInOut(duration: 0.12), value: isRowHovered)
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -107,11 +133,13 @@ struct TaskRow: View {
                 }
                 .buttonStyle(.plain)
                 .opacity(isRowHovered ? 1 : 0)
+                .allowsHitTesting(isRowHovered)
+                .animation(.easeInOut(duration: 0.12), value: isRowHovered)
                 .onHover { hovering in
                     isTrashHovered = hovering
                 }
             }
-            .padding(.leading, 6)
+            .padding(.leading, 8)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -120,6 +148,7 @@ struct TaskRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
+        .frame(height: 48)
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
@@ -271,6 +300,11 @@ struct TaskRow: View {
         tooltipWorkItem?.cancel()
         tooltipWorkItem = nil
     }
+}
+
+struct TaskCategoryBadge: Equatable {
+    let name: String
+    let color: Color
 }
 
 private struct TaskTitleWidthPreferenceKey: PreferenceKey {

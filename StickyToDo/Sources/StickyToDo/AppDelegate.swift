@@ -278,8 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentCompactWindowSize() -> NSSize {
-        let tasksOnly = store.tasks.filter { $0.isDivider == false }
-        let visibleTasks = settings.showCompletedTasks ? tasksOnly : tasksOnly.filter { $0.isDone == false }
+        let visibleTasks = settings.showCompletedTasks ? store.activeTasks : store.activeTasks.filter { $0.isDone == false }
         let previewCount = min(3, visibleTasks.count)
         let showsOverflowIndicator = visibleTasks.count > 3
         return CompactCounterView.compactWindowSize(
