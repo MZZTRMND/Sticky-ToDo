@@ -42,7 +42,7 @@ struct CompactCounterView: View {
                             .font(.system(size: Layout.taskFontSize, weight: .regular))
                             .foregroundStyle(primaryTextColor.opacity(0.7))
                             .lineLimit(1)
-                            .frame(height: Layout.taskLineHeight, alignment: .leading)
+                            .frame(height: Layout.overflowLineHeight, alignment: .leading)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,11 +118,14 @@ private enum Layout {
     static let taskFontSize: CGFloat = 16
     static let taskLineHeight: CGFloat = 24
     static let taskSpacing: CGFloat = 2
+    static let overflowLineHeight: CGFloat = 14
     static let maxPreviewTasks: Int = 3
 
     static func height(previewCount: Int, showsOverflowIndicator: Bool) -> CGFloat {
+        let taskLinesHeight = CGFloat(previewCount) * taskLineHeight
+        let overflowHeight: CGFloat = showsOverflowIndicator ? overflowLineHeight : 0
+        let listLinesHeight = taskLinesHeight + overflowHeight
         let visibleLines = previewCount + (showsOverflowIndicator ? 1 : 0)
-        let listLinesHeight = CGFloat(visibleLines) * taskLineHeight
         let listSpacingHeight = CGFloat(max(0, visibleLines - 1)) * taskSpacing
         let listTopGap = previewCount > 0 ? headerToListSpacing : 0
         return (verticalPadding * 2) + headerLineHeight + listTopGap + listLinesHeight + listSpacingHeight

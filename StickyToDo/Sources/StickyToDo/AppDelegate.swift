@@ -334,13 +334,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func compactRootView() -> some View {
-        CompactCounterView {
+        RootCompactView {
             self.setWindowMode(.full, animated: true)
         }
         .environmentObject(settings)
         .environmentObject(store)
         .environmentObject(windowModeController)
-        .preferredColorScheme(settings.preferredColorScheme)
     }
 
     @objc private func quitApp() {
@@ -361,6 +360,16 @@ private struct RootContentView: View {
     var body: some View {
         ContentView()
             .environmentObject(store)
+            .preferredColorScheme(settings.preferredColorScheme)
+    }
+}
+
+private struct RootCompactView: View {
+    @EnvironmentObject private var settings: AppSettings
+    let onExpand: () -> Void
+
+    var body: some View {
+        CompactCounterView(onExpand: onExpand)
             .preferredColorScheme(settings.preferredColorScheme)
     }
 }
