@@ -574,6 +574,7 @@ struct ContentView: View {
                             }
                     }
                 }
+                .padding(.top, Layout.listTopPadding)
             }
             .onChange(of: selectedTaskID) { selectedTaskID in
                 guard hasKeyboardSelectionActivated, let selectedTaskID else { return }
@@ -587,8 +588,6 @@ struct ContentView: View {
                     proxy.scrollTo(selectedTaskID, anchor: .center)
                 }
             }
-            .padding(.top, Layout.listTopPadding)
-            .padding(.bottom, Layout.listBottomPadding)
         }
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
@@ -600,6 +599,15 @@ struct ContentView: View {
                 endPoint: .bottom
             )
             .frame(height: Layout.listTopFadeHeight)
+            .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [cardBackgroundColor, cardBackgroundColor.opacity(0)],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .frame(height: Layout.listBottomFadeHeight)
             .allowsHitTesting(false)
         }
         .onHover { hovering in
@@ -1174,6 +1182,7 @@ private enum Layout {
     static let listBottomPadding: CGFloat = 16
     static let listMaxHeight: CGFloat = 600
     static let listTopFadeHeight: CGFloat = 20
+    static let listBottomFadeHeight: CGFloat = 20
     static let emptyStateBottomSpace: CGFloat = 100
 
     static let emptyStateMessage = EmptyStateMessage(
