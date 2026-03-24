@@ -64,7 +64,7 @@ struct ContentView: View {
                             .frame(height: Layout.emptyStateBottomSpace)
                     } else {
                         list
-                            .padding(.horizontal, Layout.sectionHorizontalPadding)
+                            .padding(.horizontal, 8)
                     }
                 }
                 .padding(.top, Layout.cardTopPadding)
@@ -1047,7 +1047,7 @@ private extension ContentView {
     }
 
     var categoryChipPointerHoverBackgroundColor: Color {
-        isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+        isDark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
     }
 
     var categoryChipPointerHoverStrokeColor: Color {
@@ -1189,7 +1189,7 @@ private enum Layout {
     static let categoryModalInputHeight: CGFloat = 44
 
     static let rowHeight: CGFloat = 48
-    static let listRowSpacing: CGFloat = 8
+    static let listRowSpacing: CGFloat = 4
     static let listTopPadding: CGFloat = 16
     static let listBottomPadding: CGFloat = 16
     static let listMaxHeight: CGFloat = 600

@@ -71,8 +71,8 @@ struct TaskRow: View {
                 } else {
                     Text(task.title)
                         .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(task.isDone ? completedTextColor : textPrimaryColor)
-                        .strikethrough(task.isDone, color: completedTextColor)
+                        .foregroundStyle(taskTitleColor)
+                        .strikethrough(task.isDone, color: taskTitleColor)
                         .lineLimit(1)
                         .background(
                             GeometryReader { proxy in
@@ -200,11 +200,22 @@ struct TaskRow: View {
     }
 
     private var textPrimaryColor: Color {
-        colorScheme == .dark ? .white : Theme.textPrimary
+        colorScheme == .dark ? Color.white.opacity(0.9) : Theme.textPrimary
+    }
+
+    private var taskTitleColor: Color {
+        if task.isDone {
+            return isRowHovered ? completedTextHoverColor : completedTextColor
+        }
+        return isRowHovered ? textHoverColor : textPrimaryColor
+    }
+
+    private var textHoverColor: Color {
+        colorScheme == .dark ? .white : Theme.textPrimary.opacity(0.72)
     }
 
     private var rowHoverColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.05) : Theme.rowHover
+        colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
     }
 
     private var trashColor: Color {
@@ -213,6 +224,10 @@ struct TaskRow: View {
 
     private var completedTextColor: Color {
         colorScheme == .dark ? Color.white.opacity(0.25) : Theme.textPrimary.opacity(0.4)
+    }
+
+    private var completedTextHoverColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.36) : Theme.textPrimary.opacity(0.3)
     }
 
     private func startEdit() {
