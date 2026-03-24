@@ -7,6 +7,7 @@ struct TaskRow: View {
     let onDelete: () -> Void
     let onRename: (String) -> Void
     let categoryBadge: TaskCategoryBadge?
+    let isSelected: Bool
     @Binding var editTrigger: Bool
     @State private var isCircleHovered = false
     @State private var isTrashHovered = false
@@ -104,10 +105,10 @@ struct TaskRow: View {
 
                     if let categoryBadge {
                         Text(categoryBadge.name)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(categoryBadge.color)
                             .lineLimit(1)
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, 6)
                             .padding(.vertical, 4)
                             .background(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -152,7 +153,7 @@ struct TaskRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill(isRowHovered ? rowHoverColor : .clear)
+                .fill((isRowHovered || isSelected) ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
@@ -168,6 +169,7 @@ struct TaskRow: View {
         .animation(.easeInOut(duration: 0.18), value: isRowHovered)
         .animation(.easeInOut(duration: 0.18), value: isCircleHovered)
         .animation(.easeInOut(duration: 0.18), value: isTrashHovered)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
         .onAppear {
             updateProgressAnimation(task.isInProgress)
         }
