@@ -116,6 +116,9 @@ struct ContentView: View {
         .onReceive(placeholderTimer) { _ in
             rotatePlaceholderIfNeeded()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            deactivateKeyboardSelectionHighlight()
+        }
         .onChange(of: store.categories) { categories in
             if let selectedCategoryID, categories.contains(where: { $0.id == selectedCategoryID }) == false {
                 self.selectedCategoryID = nil
@@ -200,6 +203,9 @@ struct ContentView: View {
             .padding(.trailing, Layout.headerTrailingPadding)
         }
         .frame(height: Layout.headerHeight, alignment: .top)
+        .onTapGesture {
+            deactivateKeyboardSelectionHighlight()
+        }
         .contextMenu {
             Button("\(windowModeController.menuTitle) ⌘⌥M") {
                 windowModeController.requestToggle()
@@ -275,6 +281,7 @@ struct ContentView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             activateWindow()
+            deactivateKeyboardSelectionHighlight()
             isInputFocused = true
         }
         .modifier(ShakeEffect(animatableData: shakeTrigger))
@@ -627,6 +634,7 @@ struct ContentView: View {
             onRename: { store.updateTitle(for: task, title: $0) },
             categoryBadge: categoryBadge(for: task),
             isSelected: hasKeyboardSelectionActivated && selectedTaskID == task.id,
+            isDragging: draggingId == task.id,
             editTrigger: taskEditBinding(for: task.id)
         )
         .onTapGesture {
@@ -837,6 +845,10 @@ struct ContentView: View {
         if visibleTasks.contains(where: { $0.id == selectedTaskID }) == false {
             self.selectedTaskID = hasKeyboardSelectionActivated ? visibleTasks.first?.id : nil
         }
+    }
+
+    private func deactivateKeyboardSelectionHighlight() {
+        hasKeyboardSelectionActivated = false
     }
 
     private func beginCategoryRename(_ category: TaskCategory) {

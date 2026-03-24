@@ -8,6 +8,7 @@ struct TaskRow: View {
     let onRename: (String) -> Void
     let categoryBadge: TaskCategoryBadge?
     let isSelected: Bool
+    let isDragging: Bool
     @Binding var editTrigger: Bool
     @State private var isCircleHovered = false
     @State private var isTrashHovered = false
@@ -124,8 +125,9 @@ struct TaskRow: View {
                             .help(categoryBadge.name)
                     }
                 }
-                .opacity(isRowHovered ? 0 : 1)
+                .opacity((isRowHovered && isDragging == false) ? 0 : 1)
                 .animation(.easeInOut(duration: 0.12), value: isRowHovered)
+                .animation(.easeInOut(duration: 0.12), value: isDragging)
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -133,9 +135,10 @@ struct TaskRow: View {
                         .font(.system(size: 18, weight: .regular))
                 }
                 .buttonStyle(.plain)
-                .opacity(isRowHovered ? 1 : 0)
-                .allowsHitTesting(isRowHovered)
+                .opacity((isRowHovered && isDragging == false) ? 1 : 0)
+                .allowsHitTesting(isRowHovered && isDragging == false)
                 .animation(.easeInOut(duration: 0.12), value: isRowHovered)
+                .animation(.easeInOut(duration: 0.12), value: isDragging)
                 .onHover { hovering in
                     isTrashHovered = hovering
                 }
@@ -153,7 +156,7 @@ struct TaskRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill((isRowHovered || isSelected) ? rowHoverColor : .clear)
+                .fill((isRowHovered || isSelected || isDragging) ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
