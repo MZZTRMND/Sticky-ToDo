@@ -389,8 +389,8 @@ struct ContentView: View {
                                             .fill(Theme.darkBase.opacity(0.35))
                                     )
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
                                     )
                             }
                         }

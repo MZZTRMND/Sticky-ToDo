@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Carbon
 import ServiceManagement
 import SwiftUI
 
@@ -7,6 +8,36 @@ import SwiftUI
 final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+}
+
+private let quickAddHotKeySignature: OSType = 0x5354444F // "STDO"
+private let quickAddHotKeyID: UInt32 = 1
+
+private func stickyToDoGlobalHotKeyHandler(
+    _ nextHandler: EventHandlerCallRef?,
+    _ event: EventRef?,
+    _ userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+    guard let userData, let event else { return OSStatus(eventNotHandledErr) }
+    let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+
+    var hotKeyID = EventHotKeyID()
+    let status = GetEventParameter(
+        event,
+        EventParamName(kEventParamDirectObject),
+        EventParamType(typeEventHotKeyID),
+        nil,
+        MemoryLayout<EventHotKeyID>.size,
+        nil,
+        &hotKeyID
+    )
+    guard status == noErr else { return status }
+
+    if hotKeyID.signature == quickAddHotKeySignature && hotKeyID.id == quickAddHotKeyID {
+        delegate.handleGlobalQuickAddHotKey()
+        return noErr
+    }
+    return OSStatus(eventNotHandledErr)
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -17,12 +48,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var quickAddWindow: NSPanel?
     private var windowMode: WindowMode = .full
     private var fullWindowFrame: NSRect?
     private var hostingView: NSHostingView<AnyView>?
     private var cancellables: Set<AnyCancellable> = []
+    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyHandlerRef: EventHandlerRef?
 
     deinit {
+        unregisterGlobalHotKey()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -32,12 +67,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bindSettingsObservers()
         applyLaunchAtLoginPreference(settings.launchAtLogin)
         createWindow()
+        registerGlobalHotKey()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(toggleMinimizeMode),
             name: .stickyToDoToggleWindowMode,
             object: nil
         )
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        unregisterGlobalHotKey()
     }
 
     private func createWindow() {
@@ -345,11 +385,129 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
+    private func registerGlobalHotKey() {
+        unregisterGlobalHotKey()
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: OSType(kEventHotKeyPressed)
+        )
+
+        let userData = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        let installStatus = InstallEventHandler(
+            GetEventDispatcherTarget(),
+            stickyToDoGlobalHotKeyHandler,
+            1,
+            &eventType,
+            userData,
+            &hotKeyHandlerRef
+        )
+        guard installStatus == noErr else { return }
+
+        let hotKeyID = EventHotKeyID(signature: quickAddHotKeySignature, id: quickAddHotKeyID)
+        let modifierFlags = UInt32(cmdKey | optionKey)
+        let registerStatus = RegisterEventHotKey(
+            UInt32(kVK_ANSI_N),
+            modifierFlags,
+            hotKeyID,
+            GetEventDispatcherTarget(),
+            0,
+            &hotKeyRef
+        )
+        if registerStatus != noErr {
+            unregisterGlobalHotKey()
+        }
+    }
+
+    fileprivate func handleGlobalQuickAddHotKey() {
+        presentOrFocusQuickAddOverlay()
+    }
+
+    private func unregisterGlobalHotKey() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+        if let hotKeyHandlerRef {
+            RemoveEventHandler(hotKeyHandlerRef)
+            self.hotKeyHandlerRef = nil
+        }
+    }
+
+    private func presentOrFocusQuickAddOverlay() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if let quickAddWindow = self.quickAddWindow {
+                quickAddWindow.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                NotificationCenter.default.post(name: .stickyToDoQuickAddFocusRequested, object: nil)
+            } else {
+                self.presentQuickAddOverlay()
+            }
+        }
+    }
+
+    private func presentQuickAddOverlay() {
+        guard let screen = activeScreenForOverlay() else { return }
+
+        let overlay = KeyablePanel(
+            contentRect: screen.frame,
+            styleMask: [.borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        overlay.setFrame(screen.frame, display: false)
+        overlay.isOpaque = false
+        overlay.backgroundColor = .clear
+        overlay.hasShadow = false
+        overlay.hidesOnDeactivate = false
+        overlay.isMovableByWindowBackground = false
+        overlay.level = .statusBar
+        overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+
+        let content = QuickAddOverlayView(
+            onSubmit: { [weak self] title in
+                self?.store.addTask(title: title)
+            },
+            onClose: { [weak self] in
+                self?.closeQuickAddOverlay()
+            }
+        )
+        .preferredColorScheme(settings.preferredColorScheme)
+
+        let host = NSHostingView(rootView: AnyView(content))
+        host.wantsLayer = true
+        host.layer?.backgroundColor = NSColor.clear.cgColor
+        overlay.contentView = host
+
+        quickAddWindow = overlay
+        overlay.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .stickyToDoQuickAddFocusRequested, object: nil)
+    }
+
+    private func closeQuickAddOverlay() {
+        quickAddWindow?.orderOut(nil)
+        quickAddWindow = nil
+    }
+
+    private func activeScreenForOverlay() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        if let mouseScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
+            return mouseScreen
+        }
+        return window?.screen ?? NSScreen.main ?? NSScreen.screens.first
+    }
+
     private var appVersionText: String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         return "Version \(short) (\(build))"
     }
+}
+
+extension Notification.Name {
+    static let stickyToDoQuickAddFocusRequested = Notification.Name("StickyToDo.QuickAddFocusRequested")
 }
 
 private struct RootContentView: View {
