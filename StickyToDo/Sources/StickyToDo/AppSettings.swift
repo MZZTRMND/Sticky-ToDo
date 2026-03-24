@@ -42,6 +42,16 @@ final class AppSettings: ObservableObject {
             UserDefaults.standard.set(showCompletedTasks, forKey: Self.showCompletedTasksKey)
         }
     }
+    @Published var taskFontSize: Double {
+        didSet {
+            UserDefaults.standard.set(taskFontSize, forKey: Self.taskFontSizeKey)
+        }
+    }
+    @Published var showCheckboxes: Bool {
+        didSet {
+            UserDefaults.standard.set(showCheckboxes, forKey: Self.showCheckboxesKey)
+        }
+    }
 
     var preferredColorScheme: ColorScheme? {
         switch appearance {
@@ -55,6 +65,8 @@ final class AppSettings: ObservableObject {
     private static let launchAtLoginKey = "StickyToDo.launchAtLogin"
     private static let showInMenuBarKey = "StickyToDo.showInMenuBar"
     private static let showCompletedTasksKey = "StickyToDo.showCompletedTasks"
+    private static let taskFontSizeKey = "StickyToDo.taskFontSize"
+    private static let showCheckboxesKey = "StickyToDo.showCheckboxes"
 
     private init() {
         let stored = UserDefaults.standard.string(forKey: Self.appearanceKey)
@@ -73,6 +85,19 @@ final class AppSettings: ObservableObject {
             showCompletedTasks = true
         } else {
             showCompletedTasks = UserDefaults.standard.bool(forKey: Self.showCompletedTasksKey)
+        }
+        let loadedTaskFontSize: Double
+        if UserDefaults.standard.object(forKey: Self.taskFontSizeKey) == nil {
+            loadedTaskFontSize = 16
+        } else {
+            let storedTaskFontSize = UserDefaults.standard.double(forKey: Self.taskFontSizeKey)
+            loadedTaskFontSize = (14...24).contains(storedTaskFontSize) ? storedTaskFontSize : 16
+        }
+        taskFontSize = loadedTaskFontSize
+        if UserDefaults.standard.object(forKey: Self.showCheckboxesKey) == nil {
+            showCheckboxes = true
+        } else {
+            showCheckboxes = UserDefaults.standard.bool(forKey: Self.showCheckboxesKey)
         }
     }
 }

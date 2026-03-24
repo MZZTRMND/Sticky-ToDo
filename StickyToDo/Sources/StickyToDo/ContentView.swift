@@ -13,10 +13,8 @@ struct ContentView: View {
     @State private var isCounterHovered = false
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
+    @State private var delayedDoneTaskIDs: Set<UUID> = []
     @State private var isDragCursorActive = false
-    @State private var selectedTaskID: UUID?
-    @State private var hasKeyboardSelectionActivated = false
-    @State private var keyEventMonitor: Any?
     @State private var isListHovered = false
     @State private var windowRef: NSWindow?
     @State private var editingTaskId: UUID?
@@ -90,11 +88,6 @@ struct ContentView: View {
         .frame(height: windowHeight)
         .onAppear {
             isInputFocused = true
-            installKeyboardMonitor()
-            syncSelectedTaskWithVisibleList()
-        }
-        .onDisappear {
-            removeKeyboardMonitor()
         }
         .background(
             WindowAccessor { window in
@@ -116,16 +109,10 @@ struct ContentView: View {
         .onReceive(placeholderTimer) { _ in
             rotatePlaceholderIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            deactivateKeyboardSelectionHighlight()
-        }
         .onChange(of: store.categories) { categories in
             if let selectedCategoryID, categories.contains(where: { $0.id == selectedCategoryID }) == false {
                 self.selectedCategoryID = nil
             }
-        }
-        .onChange(of: visibleTasks) { _ in
-            syncSelectedTaskWithVisibleList()
         }
     }
 
@@ -203,9 +190,6 @@ struct ContentView: View {
             .padding(.trailing, Layout.headerTrailingPadding)
         }
         .frame(height: Layout.headerHeight, alignment: .top)
-        .onTapGesture {
-            deactivateKeyboardSelectionHighlight()
-        }
         .contextMenu {
             Button("\(windowModeController.menuTitle) ⌘⌥M") {
                 windowModeController.requestToggle()
@@ -281,7 +265,6 @@ struct ContentView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             activateWindow()
-            deactivateKeyboardSelectionHighlight()
             isInputFocused = true
         }
         .modifier(ShakeEffect(animatableData: shakeTrigger))
@@ -563,38 +546,13 @@ struct ContentView: View {
     }
 
     private var list: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: Layout.listRowSpacing) {
-                    ForEach(visibleTasks) { task in
-                        listItem(for: task)
-                            .id(task.id)
-                            .opacity(draggingId == task.id ? 0.4 : 1.0)
-                            .onDrag {
-                                beginDragCursor()
-                                draggingId = task.id
-                                return NSItemProvider(object: task.id.uuidString as NSString)
-                            }
-                            .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
-                            .contextMenu {
-                                rowContextMenu(for: task)
-                            }
-                    }
-                }
-                .padding(.top, Layout.listTopPadding)
-            }
-            .onChange(of: selectedTaskID) { selectedTaskID in
-                guard hasKeyboardSelectionActivated, let selectedTaskID else { return }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    proxy.scrollTo(selectedTaskID, anchor: .center)
+        ScrollView {
+            LazyVStack(spacing: Layout.listRowSpacing) {
+                ForEach(visibleTasks) { task in
+                    taskRowView(for: task)
                 }
             }
-            .onChange(of: visibleTasks) { _ in
-                guard hasKeyboardSelectionActivated, let selectedTaskID else { return }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    proxy.scrollTo(selectedTaskID, anchor: .center)
-                }
-            }
+            .padding(.top, Layout.listTopPadding)
         }
         .scrollIndicators(.hidden)
         .animation(.easeInOut(duration: 0.1), value: store.tasks)
@@ -629,18 +587,30 @@ struct ContentView: View {
     private func listItem(for task: TaskItem) -> some View {
         TaskRow(
             task: task,
-            onToggle: { store.toggleDone(for: task) },
+            showCheckboxes: settings.showCheckboxes,
+            onToggle: { toggleDoneWithDelay(taskID: task.id) },
             onDelete: { store.delete(task) },
             onRename: { store.updateTitle(for: task, title: $0) },
             categoryBadge: categoryBadge(for: task),
-            isSelected: hasKeyboardSelectionActivated && selectedTaskID == task.id,
             isDragging: draggingId == task.id,
             editTrigger: taskEditBinding(for: task.id)
         )
-        .onTapGesture {
-            selectedTaskID = task.id
-            hasKeyboardSelectionActivated = true
-        }
+    }
+
+    @ViewBuilder
+    private func taskRowView(for task: TaskItem) -> some View {
+        listItem(for: task)
+            .id(task.id)
+            .opacity(draggingId == task.id ? 0.4 : 1.0)
+            .onDrag {
+                beginDragCursor()
+                draggingId = task.id
+                return NSItemProvider(object: task.id.uuidString as NSString)
+            }
+            .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+            .contextMenu {
+                rowContextMenu(for: task)
+            }
     }
 
     private func addTask() {
@@ -655,6 +625,29 @@ struct ContentView: View {
         newTaskText = ""
         isInputFocused = true
         activateWindow()
+    }
+
+    private func toggleDoneWithDelay(taskID: UUID) {
+        guard let currentTask = store.activeTasks.first(where: { $0.id == taskID }) else { return }
+
+        if currentTask.isDone {
+            delayedDoneTaskIDs.remove(taskID)
+            withAnimation(.easeInOut(duration: 0.2)) {
+                store.toggleDone(for: currentTask)
+            }
+            return
+        }
+
+        delayedDoneTaskIDs.insert(taskID)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            store.toggleDone(for: currentTask)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + Layout.doneMoveDelay) {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                _ = delayedDoneTaskIDs.remove(taskID)
+            }
+        }
     }
 
     private func activateWindow() {
@@ -721,136 +714,6 @@ struct ContentView: View {
         isDragCursorActive = false
     }
 
-    private func installKeyboardMonitor() {
-        guard keyEventMonitor == nil else { return }
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            handleKeyEvent(event)
-        }
-    }
-
-    private func removeKeyboardMonitor() {
-        guard let keyEventMonitor else { return }
-        NSEvent.removeMonitor(keyEventMonitor)
-        self.keyEventMonitor = nil
-    }
-
-    private func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
-        guard shouldHandleTaskShortcuts(for: event) else { return event }
-        switch event.keyCode {
-        case 124, 125: // Arrow Right / Arrow Down
-            hasKeyboardSelectionActivated = true
-            moveSelection(step: 1)
-            return nil
-        case 123, 126: // Arrow Left / Arrow Up
-            hasKeyboardSelectionActivated = true
-            moveSelection(step: -1)
-            return nil
-        case 49: // Space
-            guard hasKeyboardSelectionActivated else { return event }
-            toggleSelectedTask()
-            return nil
-        case 51, 117: // Delete / Forward Delete
-            guard hasKeyboardSelectionActivated else { return event }
-            deleteSelectedTask()
-            return nil
-        default:
-            return event
-        }
-    }
-
-    private func shouldHandleTaskShortcuts(for event: NSEvent) -> Bool {
-        let unsupportedModifiers: NSEvent.ModifierFlags = [.command, .control, .option]
-        if event.modifierFlags.intersection(unsupportedModifiers).isEmpty == false {
-            return false
-        }
-        if isCategoryInputFocused || focusedCategoryID != nil || isCategoryCreationPresented {
-            return false
-        }
-        if editingTaskId != nil {
-            return false
-        }
-
-        // Allow power-user shortcuts even when the add-input has focus,
-        // but only while it's empty (so we don't hijack normal typing/editing).
-        if isInputFocused && newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return true
-        }
-
-        if windowRef?.firstResponder is NSTextView {
-            return false
-        }
-        return true
-    }
-
-    private func moveSelection(step: Int) {
-        let tasks = visibleTasks
-        guard tasks.isEmpty == false else {
-            selectedTaskID = nil
-            return
-        }
-
-        guard let currentSelectedTaskID = selectedTaskID,
-              let currentIndex = tasks.firstIndex(where: { $0.id == currentSelectedTaskID }) else {
-            selectedTaskID = step >= 0 ? tasks.first?.id : tasks.last?.id
-            return
-        }
-
-        let nextIndex = max(0, min(tasks.count - 1, currentIndex + step))
-        self.selectedTaskID = tasks[nextIndex].id
-    }
-
-    private func toggleSelectedTask() {
-        let tasks = visibleTasks
-        guard let selectedTaskID, let index = tasks.firstIndex(where: { $0.id == selectedTaskID }) else { return }
-        let task = tasks[index]
-        store.toggleDone(for: task)
-
-        let updatedTasks = visibleTasks
-        if updatedTasks.contains(where: { $0.id == selectedTaskID }) {
-            return
-        }
-        guard updatedTasks.isEmpty == false else {
-            self.selectedTaskID = nil
-            return
-        }
-        let targetIndex = min(index, updatedTasks.count - 1)
-        self.selectedTaskID = updatedTasks[targetIndex].id
-    }
-
-    private func deleteSelectedTask() {
-        let tasks = visibleTasks
-        guard let selectedTaskID, let index = tasks.firstIndex(where: { $0.id == selectedTaskID }) else { return }
-        store.delete(tasks[index])
-
-        let updatedTasks = visibleTasks
-        guard updatedTasks.isEmpty == false else {
-            self.selectedTaskID = nil
-            return
-        }
-        let targetIndex = min(index, updatedTasks.count - 1)
-        self.selectedTaskID = updatedTasks[targetIndex].id
-    }
-
-    private func syncSelectedTaskWithVisibleList() {
-        guard visibleTasks.isEmpty == false else {
-            selectedTaskID = nil
-            return
-        }
-        guard let selectedTaskID else {
-            if hasKeyboardSelectionActivated {
-                self.selectedTaskID = visibleTasks.first?.id
-            }
-            return
-        }
-        if visibleTasks.contains(where: { $0.id == selectedTaskID }) == false {
-            self.selectedTaskID = hasKeyboardSelectionActivated ? visibleTasks.first?.id : nil
-        }
-    }
-
-    private func deactivateKeyboardSelectionHighlight() {
-        hasKeyboardSelectionActivated = false
-    }
-
     private func beginCategoryRename(_ category: TaskCategory) {
         cancelCategoryCreation()
         editingCategoryID = category.id
@@ -884,10 +747,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private func rowContextMenu(for task: TaskItem) -> some View {
+        Button(task.isDone ? "Unmark as done" : "Mark as done") {
+            toggleDoneWithDelay(taskID: task.id)
+        }
+
         Button(task.isInProgress ? "Unmark in progress" : "Mark as in progress") {
             store.setInProgress(task.isInProgress == false, for: task)
         }
-        Divider()
 
         Button(task.isImportant ? "Unmark as important" : "Mark as important") {
             store.setImportant(task.isImportant == false, for: task)
@@ -895,14 +761,34 @@ struct ContentView: View {
         Divider()
 
         Menu("Move to category") {
+            Button {
+                store.assignCategory(nil, to: task)
+            } label: {
+                if task.categoryID == nil {
+                    Label("No category", systemImage: "checkmark")
+                } else {
+                    Text("No category")
+                }
+            }
+
+            if store.categories.isEmpty == false {
+                Divider()
+            }
+
             if store.categories.isEmpty {
                 Button("Create new category") {
                     beginCategoryCreation(for: task.id)
                 }
             } else {
                 ForEach(store.categories) { category in
-                    Button(category.name) {
+                    Button {
                         store.assignCategory(category.id, to: task)
+                    } label: {
+                        if task.categoryID == category.id {
+                            Label(category.name, systemImage: "checkmark")
+                        } else {
+                            Text(category.name)
+                        }
                     }
                 }
                 Divider()
@@ -941,6 +827,28 @@ struct ContentView: View {
 
 private extension ContentView {
     var visibleTasks: [TaskItem] {
+        visiblePendingTasks + visibleDoneTasks
+    }
+
+    var visiblePendingTasks: [TaskItem] {
+        filteredTasks.filter { $0.isDone == false || delayedDoneTaskIDs.contains($0.id) }
+    }
+
+    var visibleDoneTasks: [TaskItem] {
+        guard settings.showCompletedTasks else { return [] }
+        return filteredTasks
+            .filter { $0.isDone && delayedDoneTaskIDs.contains($0.id) == false }
+            .sorted { lhs, rhs in
+                let leftDate = lhs.doneAt ?? lhs.createdAt
+                let rightDate = rhs.doneAt ?? rhs.createdAt
+                if leftDate != rightDate {
+                    return leftDate > rightDate
+                }
+                return lhs.createdAt > rhs.createdAt
+            }
+    }
+
+    var filteredTasks: [TaskItem] {
         let base = settings.showCompletedTasks
             ? store.activeTasks
             : store.activeTasks.filter { $0.isDone == false }
@@ -1024,26 +932,26 @@ private extension ContentView {
 
     func categoryChipDropHoverBackgroundColor(isSelected: Bool) -> Color {
         if isSelected {
-            return isDark ? Color.white.opacity(0.42) : Color.white.opacity(0.88)
+            return categoryChipSelectedBackgroundColor
         }
         return isDark ? .white : .black
     }
 
     func categoryChipDropHoverStrokeColor(isSelected: Bool) -> Color {
         if isSelected {
-            return isDark ? Color.white.opacity(0.50) : Color.black.opacity(0.20)
+            return .clear
         }
         return Theme.textPrimary
     }
 
     func categoryChipTextColor(isSelected: Bool, isDropHovered: Bool) -> Color {
+        if isSelected {
+            return categoryChipSelectedTextColor
+        }
         if isDropHovered {
-            if isSelected {
-                return primaryTextColor
-            }
             return isDark ? Theme.textPrimary : .white
         }
-        return isSelected ? categoryChipSelectedTextColor : primaryTextColor
+        return primaryTextColor
     }
 
     var categoryChipPointerHoverBackgroundColor: Color {
@@ -1195,6 +1103,7 @@ private enum Layout {
     static let listMaxHeight: CGFloat = 600
     static let listTopFadeHeight: CGFloat = 20
     static let listBottomFadeHeight: CGFloat = 20
+    static let doneMoveDelay: TimeInterval = 0.30
     static let emptyStateBottomSpace: CGFloat = 100
 
     static let emptyStateMessage = EmptyStateMessage(

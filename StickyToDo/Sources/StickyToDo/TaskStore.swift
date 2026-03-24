@@ -44,6 +44,9 @@ final class TaskStore: ObservableObject {
         tasks[index].isDone.toggle()
         if tasks[index].isDone {
             tasks[index].isInProgress = false
+            tasks[index].doneAt = Date()
+        } else {
+            tasks[index].doneAt = nil
         }
     }
 

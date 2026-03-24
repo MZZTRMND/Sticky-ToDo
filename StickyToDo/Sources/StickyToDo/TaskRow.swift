@@ -3,11 +3,11 @@ import AppKit
 
 struct TaskRow: View {
     let task: TaskItem
+    let showCheckboxes: Bool
     let onToggle: () -> Void
     let onDelete: () -> Void
     let onRename: (String) -> Void
     let categoryBadge: TaskCategoryBadge?
-    let isSelected: Bool
     let isDragging: Bool
     @Binding var editTrigger: Bool
     @State private var isCircleHovered = false
@@ -22,41 +22,44 @@ struct TaskRow: View {
     @State private var tooltipWorkItem: DispatchWorkItem?
     @FocusState private var isEditingFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            Circle()
-                .fill(task.isDone ? (colorScheme == .dark ? .white : Theme.doneGreen) : .clear)
-                .overlay(
-                    Group {
-                        if task.isInProgress {
-                            Circle()
-                                .stroke(
-                                    circleStrokeColor,
-                                    style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3])
-                                )
-                                .rotationEffect(.degrees(progressRotation))
-                        } else if task.isDone == false {
-                            Circle()
-                                .stroke(circleStrokeColor, lineWidth: 2)
+            if showCheckboxes {
+                Circle()
+                    .fill(task.isDone ? (colorScheme == .dark ? .white : Theme.doneGreen) : .clear)
+                    .overlay(
+                        Group {
+                            if task.isInProgress {
+                                Circle()
+                                    .stroke(
+                                        circleStrokeColor,
+                                        style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3])
+                                    )
+                                    .rotationEffect(.degrees(progressRotation))
+                            } else if task.isDone == false {
+                                Circle()
+                                    .stroke(circleStrokeColor, lineWidth: 2)
+                            }
                         }
+                    )
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(task.isDone ? (colorScheme == .dark ? Theme.textPrimary : .white) : .clear)
+                    )
+                    .onHover { hovering in
+                        isCircleHovered = hovering
                     }
-                )
-                .frame(width: 20, height: 20)
-                .overlay(
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(task.isDone ? (colorScheme == .dark ? Theme.textPrimary : .white) : .clear)
-                )
-                .onHover { hovering in
-                    isCircleHovered = hovering
-                }
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 if isEditing {
                     TextField("", text: $draftTitle)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 16, weight: .regular))
+                        .font(.system(size: taskFontSize, weight: .regular))
                         .foregroundStyle(textPrimaryColor)
                         .focused($isEditingFocused)
                         .onSubmit(commitEdit)
@@ -70,7 +73,7 @@ struct TaskRow: View {
                         }
                 } else {
                     Text(task.title)
-                        .font(.system(size: 16, weight: .regular))
+                        .font(.system(size: taskFontSize, weight: .regular))
                         .foregroundStyle(taskTitleColor)
                         .strikethrough(task.isDone, color: taskTitleColor)
                         .lineLimit(1)
@@ -92,7 +95,7 @@ struct TaskRow: View {
                         }
                 }
             }
-            .padding(.leading, 12)
+            .padding(.leading, showCheckboxes ? 12 : 0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
@@ -156,7 +159,7 @@ struct TaskRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill((isRowHovered || isSelected || isDragging) ? rowHoverColor : .clear)
+                .fill((isRowHovered || isDragging) ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
@@ -172,12 +175,16 @@ struct TaskRow: View {
         .animation(.easeInOut(duration: 0.18), value: isRowHovered)
         .animation(.easeInOut(duration: 0.18), value: isCircleHovered)
         .animation(.easeInOut(duration: 0.18), value: isTrashHovered)
-        .animation(.easeInOut(duration: 0.18), value: isSelected)
         .onAppear {
             updateProgressAnimation(task.isInProgress)
         }
         .onChange(of: task.isInProgress) { isInProgress in
             updateProgressAnimation(isInProgress)
+        }
+        .onChange(of: task.isDone) { _ in
+            isRowHovered = false
+            isTrashHovered = false
+            isCircleHovered = false
         }
         .onChange(of: editTrigger) { shouldEdit in
             guard shouldEdit else { return }
@@ -205,13 +212,13 @@ struct TaskRow: View {
 
     private var taskTitleColor: Color {
         if task.isDone {
-            return isRowHovered ? completedTextHoverColor : completedTextColor
+            return completedTextColor
         }
-        return isRowHovered ? textHoverColor : textPrimaryColor
+        return textPrimaryColor
     }
 
-    private var textHoverColor: Color {
-        colorScheme == .dark ? .white : Theme.textPrimary.opacity(0.72)
+    private var taskFontSize: CGFloat {
+        CGFloat(settings.taskFontSize)
     }
 
     private var rowHoverColor: Color {
@@ -224,10 +231,6 @@ struct TaskRow: View {
 
     private var completedTextColor: Color {
         colorScheme == .dark ? Color.white.opacity(0.25) : Theme.textPrimary.opacity(0.4)
-    }
-
-    private var completedTextHoverColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.36) : Theme.textPrimary.opacity(0.3)
     }
 
     private func startEdit() {
@@ -270,7 +273,7 @@ struct TaskRow: View {
     private var isTitleTruncated: Bool {
         guard titleAvailableWidth > 0 else { return false }
         let measured = (task.title as NSString).size(
-            withAttributes: [.font: NSFont.systemFont(ofSize: 16, weight: .regular)]
+            withAttributes: [.font: NSFont.systemFont(ofSize: taskFontSize, weight: .regular)]
         ).width
         return measured > titleAvailableWidth + 1
     }

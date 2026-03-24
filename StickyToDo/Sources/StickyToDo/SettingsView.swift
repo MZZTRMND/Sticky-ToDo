@@ -32,6 +32,17 @@ struct SettingsView: View {
                 Text("Tasks")
                     .font(.system(size: 13, weight: .semibold))
                 Toggle("Show Completed Tasks", isOn: $settings.showCompletedTasks)
+                Toggle("Show Checkboxes", isOn: $settings.showCheckboxes)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Task Font Size")
+                        Spacer()
+                        Text("\(Int(settings.taskFontSize))")
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $settings.taskFontSize, in: 14...24, step: 1)
+                }
             }
         }
         .padding(16)
