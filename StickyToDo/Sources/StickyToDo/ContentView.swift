@@ -14,6 +14,9 @@ struct ContentView: View {
     @State private var shakeTrigger: CGFloat = 0
     @State private var draggingId: UUID?
     @State private var isDragCursorActive = false
+    @State private var selectedTaskID: UUID?
+    @State private var hasKeyboardSelectionActivated = false
+    @State private var keyEventMonitor: Any?
     @State private var isListHovered = false
     @State private var windowRef: NSWindow?
     @State private var editingTaskId: UUID?
@@ -87,6 +90,11 @@ struct ContentView: View {
         .frame(height: windowHeight)
         .onAppear {
             isInputFocused = true
+            installKeyboardMonitor()
+            syncSelectedTaskWithVisibleList()
+        }
+        .onDisappear {
+            removeKeyboardMonitor()
         }
         .background(
             WindowAccessor { window in
@@ -112,6 +120,9 @@ struct ContentView: View {
             if let selectedCategoryID, categories.contains(where: { $0.id == selectedCategoryID }) == false {
                 self.selectedCategoryID = nil
             }
+        }
+        .onChange(of: visibleTasks) { _ in
+            syncSelectedTaskWithVisibleList()
         }
     }
 
@@ -545,20 +556,35 @@ struct ContentView: View {
     }
 
     private var list: some View {
-        ScrollView {
-            LazyVStack(spacing: Layout.listRowSpacing) {
-                ForEach(visibleTasks) { task in
-                    listItem(for: task)
-                        .opacity(draggingId == task.id ? 0.4 : 1.0)
-                        .onDrag {
-                            beginDragCursor()
-                            draggingId = task.id
-                            return NSItemProvider(object: task.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
-                        .contextMenu {
-                            rowContextMenu(for: task)
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: Layout.listRowSpacing) {
+                    ForEach(visibleTasks) { task in
+                        listItem(for: task)
+                            .id(task.id)
+                            .opacity(draggingId == task.id ? 0.4 : 1.0)
+                            .onDrag {
+                                beginDragCursor()
+                                draggingId = task.id
+                                return NSItemProvider(object: task.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: ReorderDropDelegate(target: task, store: store, draggingId: $draggingId))
+                            .contextMenu {
+                                rowContextMenu(for: task)
+                            }
+                    }
+                }
+            }
+            .onChange(of: selectedTaskID) { selectedTaskID in
+                guard hasKeyboardSelectionActivated, let selectedTaskID else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    proxy.scrollTo(selectedTaskID, anchor: .center)
+                }
+            }
+            .onChange(of: visibleTasks) { _ in
+                guard hasKeyboardSelectionActivated, let selectedTaskID else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    proxy.scrollTo(selectedTaskID, anchor: .center)
                 }
             }
             .padding(.top, Layout.listTopPadding)
@@ -592,8 +618,13 @@ struct ContentView: View {
             onDelete: { store.delete(task) },
             onRename: { store.updateTitle(for: task, title: $0) },
             categoryBadge: categoryBadge(for: task),
+            isSelected: hasKeyboardSelectionActivated && selectedTaskID == task.id,
             editTrigger: taskEditBinding(for: task.id)
         )
+        .onTapGesture {
+            selectedTaskID = task.id
+            hasKeyboardSelectionActivated = true
+        }
     }
 
     private func addTask() {
@@ -672,6 +703,132 @@ struct ContentView: View {
         guard isDragCursorActive else { return }
         NSCursor.pop()
         isDragCursorActive = false
+    }
+
+    private func installKeyboardMonitor() {
+        guard keyEventMonitor == nil else { return }
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            handleKeyEvent(event)
+        }
+    }
+
+    private func removeKeyboardMonitor() {
+        guard let keyEventMonitor else { return }
+        NSEvent.removeMonitor(keyEventMonitor)
+        self.keyEventMonitor = nil
+    }
+
+    private func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
+        guard shouldHandleTaskShortcuts(for: event) else { return event }
+        switch event.keyCode {
+        case 124, 125: // Arrow Right / Arrow Down
+            hasKeyboardSelectionActivated = true
+            moveSelection(step: 1)
+            return nil
+        case 123, 126: // Arrow Left / Arrow Up
+            hasKeyboardSelectionActivated = true
+            moveSelection(step: -1)
+            return nil
+        case 49: // Space
+            guard hasKeyboardSelectionActivated else { return event }
+            toggleSelectedTask()
+            return nil
+        case 51, 117: // Delete / Forward Delete
+            guard hasKeyboardSelectionActivated else { return event }
+            deleteSelectedTask()
+            return nil
+        default:
+            return event
+        }
+    }
+
+    private func shouldHandleTaskShortcuts(for event: NSEvent) -> Bool {
+        let unsupportedModifiers: NSEvent.ModifierFlags = [.command, .control, .option]
+        if event.modifierFlags.intersection(unsupportedModifiers).isEmpty == false {
+            return false
+        }
+        if isCategoryInputFocused || focusedCategoryID != nil || isCategoryCreationPresented {
+            return false
+        }
+        if editingTaskId != nil {
+            return false
+        }
+
+        // Allow power-user shortcuts even when the add-input has focus,
+        // but only while it's empty (so we don't hijack normal typing/editing).
+        if isInputFocused && newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+
+        if windowRef?.firstResponder is NSTextView {
+            return false
+        }
+        return true
+    }
+
+    private func moveSelection(step: Int) {
+        let tasks = visibleTasks
+        guard tasks.isEmpty == false else {
+            selectedTaskID = nil
+            return
+        }
+
+        guard let currentSelectedTaskID = selectedTaskID,
+              let currentIndex = tasks.firstIndex(where: { $0.id == currentSelectedTaskID }) else {
+            selectedTaskID = step >= 0 ? tasks.first?.id : tasks.last?.id
+            return
+        }
+
+        let nextIndex = max(0, min(tasks.count - 1, currentIndex + step))
+        self.selectedTaskID = tasks[nextIndex].id
+    }
+
+    private func toggleSelectedTask() {
+        let tasks = visibleTasks
+        guard let selectedTaskID, let index = tasks.firstIndex(where: { $0.id == selectedTaskID }) else { return }
+        let task = tasks[index]
+        store.toggleDone(for: task)
+
+        let updatedTasks = visibleTasks
+        if updatedTasks.contains(where: { $0.id == selectedTaskID }) {
+            return
+        }
+        guard updatedTasks.isEmpty == false else {
+            self.selectedTaskID = nil
+            return
+        }
+        let targetIndex = min(index, updatedTasks.count - 1)
+        self.selectedTaskID = updatedTasks[targetIndex].id
+    }
+
+    private func deleteSelectedTask() {
+        let tasks = visibleTasks
+        guard let selectedTaskID, let index = tasks.firstIndex(where: { $0.id == selectedTaskID }) else { return }
+        store.delete(tasks[index])
+
+        let updatedTasks = visibleTasks
+        guard updatedTasks.isEmpty == false else {
+            self.selectedTaskID = nil
+            return
+        }
+        let targetIndex = min(index, updatedTasks.count - 1)
+        self.selectedTaskID = updatedTasks[targetIndex].id
+    }
+
+    private func syncSelectedTaskWithVisibleList() {
+        guard visibleTasks.isEmpty == false else {
+            selectedTaskID = nil
+            return
+        }
+        guard let selectedTaskID else {
+            if hasKeyboardSelectionActivated {
+                self.selectedTaskID = visibleTasks.first?.id
+            }
+            return
+        }
+        if visibleTasks.contains(where: { $0.id == selectedTaskID }) == false {
+            self.selectedTaskID = hasKeyboardSelectionActivated ? visibleTasks.first?.id : nil
+        }
     }
 
     private func beginCategoryRename(_ category: TaskCategory) {
