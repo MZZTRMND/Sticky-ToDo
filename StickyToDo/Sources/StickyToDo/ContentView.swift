@@ -873,16 +873,26 @@ private extension ContentView {
 
     var inputBackground: some View {
         let stroke = isDark
-            ? (isInputHovered ? Color.white.opacity(0.26) : Color.white.opacity(0.18))
+            ? (isInputHovered ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
             : (isInputHovered ? Color.black.opacity(0.18) : Color.black.opacity(0.10))
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-            .fill(Color.clear)
-            .animation(.easeInOut(duration: 0.18), value: isInputHovered)
+            .fill(isDark ? Color.clear : Color.clear)
+            .overlay {
+                if isDark {
+                    RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
+                        .fill(.regularMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
+                                .fill(Theme.darkBase.opacity(0.35))
+                        )
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
                     .stroke(stroke, lineWidth: 1)
             )
+            .animation(.easeInOut(duration: 0.16), value: isInputHovered)
     }
 
     var windowHeight: CGFloat {
