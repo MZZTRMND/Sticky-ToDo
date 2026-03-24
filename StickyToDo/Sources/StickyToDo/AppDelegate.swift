@@ -141,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "StickyToDo")
+            button.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "StickyToDo")
         }
 
         let menu = NSMenu()
