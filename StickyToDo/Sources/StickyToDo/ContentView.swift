@@ -366,7 +366,7 @@ struct ContentView: View {
 
     private var categoryCreationOverlay: some View {
         ZStack {
-            Color.black.opacity(isCategoryModalAnimatingIn ? 0.40 : 0.0)
+            Color.black.opacity(isCategoryModalAnimatingIn ? 0.30 : 0.0)
                 .onTapGesture {
                     cancelCategoryCreation()
                 }
@@ -873,24 +873,20 @@ private extension ContentView {
 
     var inputBackground: some View {
         let stroke = isDark
-            ? (isInputHovered ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
-            : (isInputHovered ? Color.black.opacity(0.18) : Color.black.opacity(0.10))
+            ? (isInputHovered ? Color.white.opacity(0.10) : Color.white.opacity(0.06))
+            : (isInputHovered ? Theme.textPrimary.opacity(0.10) : Theme.textPrimary.opacity(0.06))
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-            .fill(isDark ? Color.clear : Color.clear)
-            .overlay {
-                if isDark {
-                    RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-                                .fill(Theme.darkBase.opacity(0.35))
-                        )
-                }
-            }
+            .fill(isDark ? Theme.darkInput : Color.white)
             .overlay(
                 RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
                     .stroke(stroke, lineWidth: 1)
+            )
+            .shadow(
+                color: isDark ? Color.black.opacity(0.12) : Color.black.opacity(0.05),
+                radius: 3,
+                x: 0,
+                y: 1
             )
             .animation(.easeInOut(duration: 0.16), value: isInputHovered)
     }
@@ -937,7 +933,7 @@ private extension ContentView {
     }
 
     var categoryChipStrokeColor: Color {
-        isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.12)
+        isDark ? Color.white.opacity(0.10) : Theme.textPrimary.opacity(0.08)
     }
 
     func categoryChipDropHoverBackgroundColor(isSelected: Bool) -> Color {
@@ -965,11 +961,11 @@ private extension ContentView {
     }
 
     var categoryChipPointerHoverBackgroundColor: Color {
-        isDark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
+        isDark ? Color.white.opacity(0.05) : Theme.textPrimary.opacity(0.04)
     }
 
     var categoryChipPointerHoverStrokeColor: Color {
-        isDark ? Color.white.opacity(0.28) : Color.black.opacity(0.18)
+        isDark ? Color.white.opacity(0.16) : Theme.textPrimary.opacity(0.12)
     }
 
     func categoryChipBorderColor(
@@ -1042,8 +1038,8 @@ private extension ContentView {
                 .fill(isDark ? Theme.darkBase : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(
-                            isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                            .stroke(
+                            isDark ? Color.white.opacity(0.12) : Theme.textPrimary.opacity(0.08),
                             lineWidth: 1
                         )
                 )

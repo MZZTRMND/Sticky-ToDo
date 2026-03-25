@@ -2,17 +2,18 @@ import SwiftUI
 import AppKit
 
 enum Theme {
-    static let darkBase = Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0)) // #1E1E1E
-    static let lightCard = Color(nsColor: NSColor(calibratedRed: 0.969, green: 0.969, blue: 0.961, alpha: 1.0)) // #F7F7F5
-    static let rowHover = Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 0.05)) // rgba(30,30,30,0.05)
+    static let darkBase = Color(nsColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)) // #141414
+    static let darkInput = Color(nsColor: NSColor(calibratedRed: 0.102, green: 0.102, blue: 0.102, alpha: 1.0)) // #1A1A1A
+    static let lightCard = Color.white // #FFFFFF
+    static let rowHover = darkBase.opacity(0.05)
     static let textPrimary = darkBase
-    static let placeholder = Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 0.4)) // #1E1E1E @ 40%
-    static let iconLight = Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 0.2)) // #1E1E1E @ 20%
+    static let placeholder = darkBase.opacity(0.4)
+    static let iconLight = darkBase.opacity(0.2)
     static let iconDark = darkBase
     static let accentOrange = Color(nsColor: NSColor(calibratedRed: 0.851, green: 0.463, blue: 0.271, alpha: 1.0)) // #D97645
     static let accentYellow = Color(nsColor: NSColor(calibratedRed: 0.976, green: 0.694, blue: 0.275, alpha: 1.0)) // #F9B146
-    static let doneGreen = Color(nsColor: NSColor(calibratedRed: 0.118, green: 0.118, blue: 0.118, alpha: 1.0)) // #1E1E1E
-    static let glassBorderLight = Color.black.opacity(0.10)
+    static let doneGreen = darkBase
+    static let glassBorderLight = darkBase.opacity(0.10)
     static let glassBorderDark = Color.white.opacity(0.14)
 
     static let categoryPalette: [String] = [
