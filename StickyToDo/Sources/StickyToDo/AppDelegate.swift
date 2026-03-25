@@ -287,14 +287,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let window else { return }
         let currentFrame = window.frame
         let targetFrame: NSRect
+        var shouldRefreshFullSizeOnNextRunLoop = false
         switch windowMode {
         case .full:
             window.styleMask.insert(.resizable)
             window.minSize = NSSize(width: 350, height: 200)
             window.maxSize = NSSize(width: 600, height: 600)
             setRootView(for: .full)
-            let targetSize = fullWindowFrame?.size ?? currentFrame.size
+            let targetSize = preferredFullWindowSize(fallback: currentFrame.size)
             targetFrame = centeredFrame(from: currentFrame, targetSize: targetSize)
+            shouldRefreshFullSizeOnNextRunLoop = true
         case .compact:
             window.styleMask.remove(.resizable)
             let compactSize = currentCompactWindowSize()
@@ -315,6 +317,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // SwiftUI can report a stale fitting height immediately after switching
+        // from compact -> full. Re-check on the next run loop to avoid clipping.
+        if shouldRefreshFullSizeOnNextRunLoop {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshFullWindowSizeIfNeeded(animated: animated)
+            }
+        }
+    }
+
+    private func preferredFullWindowSize(fallback: NSSize) -> NSSize {
+        let savedSize = fullWindowFrame?.size ?? fallback
+
+        let minWidth: CGFloat = 350
+        let maxWidth: CGFloat = 600
+        let minHeight: CGFloat = 200
+        let maxHeight: CGFloat = 600
+
+        let width = min(max(savedSize.width, minWidth), maxWidth)
+
+        hostingView?.layoutSubtreeIfNeeded()
+        let fittingHeight = hostingView?.fittingSize.height ?? 0
+        let desiredHeight = max(savedSize.height, fittingHeight)
+        let height = min(max(desiredHeight, minHeight), maxHeight)
+
+        return NSSize(width: width, height: height)
+    }
+
+    private func refreshFullWindowSizeIfNeeded(animated: Bool) {
+        guard windowMode == .full, let window else { return }
+
+        let targetSize = preferredFullWindowSize(fallback: window.frame.size)
+        guard abs(targetSize.width - window.frame.width) > 0.5 || abs(targetSize.height - window.frame.height) > 0.5 else {
+            return
+        }
+
+        let targetFrame = centeredFrame(from: window.frame, targetSize: targetSize)
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func currentCompactWindowSize() -> NSSize {
