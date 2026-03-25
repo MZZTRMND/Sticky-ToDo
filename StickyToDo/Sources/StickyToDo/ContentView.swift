@@ -874,7 +874,7 @@ private extension ContentView {
     var inputBackground: some View {
         let stroke = isDark
             ? (isInputHovered ? Color.white.opacity(0.10) : Color.white.opacity(0.06))
-            : (isInputHovered ? Theme.textPrimary.opacity(0.10) : Theme.textPrimary.opacity(0.06))
+            : (isInputHovered ? Theme.textPrimary.opacity(0.12) : Theme.textPrimary.opacity(0.08))
 
         return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
             .fill(isDark ? Theme.darkInput : Color.white)
