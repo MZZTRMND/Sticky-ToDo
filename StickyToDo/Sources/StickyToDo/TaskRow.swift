@@ -222,7 +222,7 @@ struct TaskRow: View {
     }
 
     private var rowHoverColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
+        colorScheme == .dark ? Color.white.opacity(0.05) : Theme.textPrimary.opacity(0.02)
     }
 
     private var trashColor: Color {
@@ -290,7 +290,7 @@ struct TaskRow: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(
-                                colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08),
+                                colorScheme == .dark ? Color.white.opacity(0.12) : Theme.textPrimary.opacity(0.08),
                                 lineWidth: 1
                             )
                     )
