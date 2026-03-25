@@ -74,6 +74,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .stickyToDoToggleWindowMode,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(presentQuickAddFromInAppRequest),
+            name: .stickyToDoPresentQuickAddRequested,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -271,6 +277,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func mainWindowVisibilityDidChange() {
         // Reserved for future window-state menu sync.
+    }
+
+    @objc private func presentQuickAddFromInAppRequest() {
+        presentOrFocusQuickAddOverlay()
     }
 
     private func setWindowMode(_ mode: WindowMode, animated: Bool) {
@@ -555,6 +565,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension Notification.Name {
     static let stickyToDoQuickAddFocusRequested = Notification.Name("StickyToDo.QuickAddFocusRequested")
+    static let stickyToDoPresentQuickAddRequested = Notification.Name("StickyToDo.PresentQuickAddRequested")
 }
 
 private struct RootContentView: View {
