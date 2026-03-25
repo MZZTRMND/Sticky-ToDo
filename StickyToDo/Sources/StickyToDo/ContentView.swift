@@ -6,12 +6,9 @@ struct ContentView: View {
     @EnvironmentObject private var store: TaskStore
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var windowModeController: WindowModeController
-    @State private var newTaskText = ""
-    @FocusState private var isInputFocused: Bool
-    @State private var isAddHovered = false
-    @State private var isInputHovered = false
-    @State private var isCounterHovered = false
-    @State private var shakeTrigger: CGFloat = 0
+    @State private var isHeaderQuickAddHovered = false
+    @State private var isHeaderQuickAddTooltipVisible = false
+    @State private var headerQuickAddTooltipWorkItem: DispatchWorkItem?
     @State private var draggingId: UUID?
     @State private var delayedDoneTaskIDs: Set<UUID> = []
     @State private var isDragCursorActive = false
@@ -30,30 +27,25 @@ struct ContentView: View {
     @State private var isCategoryCreationPresented = false
     @State private var pendingCategoryTaskID: UUID?
     @State private var newCategoryName = ""
-    @State private var placeholderIndex = 0
     @State private var isCategoryModalAnimatingIn = false
     @State private var categoryShakeTrigger: CGFloat = 0
     @FocusState private var isCategoryInputFocused: Bool
     @FocusState private var focusedCategoryID: UUID?
     @Environment(\.colorScheme) private var colorScheme
-    private let placeholderTimer = Timer.publish(every: 5.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let date = Date.now
         let dayNumber = Calendar.current.component(.day, from: date)
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             ZStack {
                 RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
                     .fill(cardBackgroundColor)
 
                 VStack(spacing: 0) {
-                    VStack(spacing: Layout.headerToInputSpacing) {
-                        header(dayNumber: dayNumber, date: date)
-                            .padding(.top, Layout.headerSectionTopPadding)
-                            .padding(.horizontal, Layout.sectionHorizontalPadding)
-                        inputRow
-                            .padding(.horizontal, Layout.sectionHorizontalPadding)
-                    }
+                    header(dayNumber: dayNumber, date: date)
+                        .padding(.top, Layout.headerSectionTopPadding)
+                        .padding(.horizontal, Layout.sectionHorizontalPadding)
+
                     if shouldShowCategorySection {
                         categorySection
                     }
@@ -75,20 +67,17 @@ struct ContentView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous))
-
-            if isCounterHovered && store.taskCount > 0 {
-                counterTooltip
-                    .padding(.top, Layout.counterTooltipTop)
-                    .padding(.trailing, Layout.counterTooltipTrailing)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    .zIndex(2)
+            .overlay(alignment: .topTrailing) {
+                if isHeaderQuickAddTooltipVisible {
+                    quickAddButtonTooltip
+                        .padding(.top, Layout.quickAddTooltipTop)
+                        .padding(.trailing, Layout.quickAddTooltipTrailing)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
             }
         }
         .frame(minWidth: Layout.cardWidth, maxWidth: 600)
         .frame(height: windowHeight)
-        .onAppear {
-            isInputFocused = true
-        }
         .background(
             WindowAccessor { window in
                 windowRef = window
@@ -106,13 +95,13 @@ struct ContentView: View {
                 endDragCursor()
             }
         }
-        .onReceive(placeholderTimer) { _ in
-            rotatePlaceholderIfNeeded()
-        }
         .onChange(of: store.categories) { categories in
             if let selectedCategoryID, categories.contains(where: { $0.id == selectedCategoryID }) == false {
                 self.selectedCategoryID = nil
             }
+        }
+        .onDisappear {
+            cancelHeaderQuickAddTooltipWorkItem()
         }
     }
 
@@ -128,6 +117,12 @@ struct ContentView: View {
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(placeholderTextColor)
                     .multilineTextAlignment(.center)
+
+                Text(Layout.emptyStateMessage.line3)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(primaryTextColor)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -158,32 +153,33 @@ struct ContentView: View {
                 }
                 Spacer()
 
-                if store.taskCount > 0 {
-                    ZStack {
-                        Circle()
-                            .stroke(counterTrackColor, lineWidth: Layout.counterLineWidth)
-                            .frame(width: Layout.counterSize, height: Layout.counterSize)
-
-                        Circle()
-                            .trim(from: 0, to: counterProgress)
-                            .stroke(
-                                counterProgressColor,
-                                style: StrokeStyle(lineWidth: Layout.counterLineWidth, lineCap: .butt)
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: Layout.counterSize, height: Layout.counterSize)
-                            .animation(.easeInOut(duration: 0.2), value: counterProgress)
-                    }
-                    .frame(width: Layout.counterHitSize, height: Layout.counterHitSize)
-                    .contentShape(Rectangle())
-                    .scaleEffect(isCounterHovered ? 1.08 : 1.0)
-                    .animation(.easeInOut(duration: 0.15), value: isCounterHovered)
-                    .padding(.top, -25)
-                    .onHover { hovering in
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isCounterHovered = hovering
-                        }
-                    }
+                Button(action: {
+                    cancelHeaderQuickAddTooltipWorkItem()
+                    isHeaderQuickAddTooltipVisible = false
+                    presentQuickAddOverlay()
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: Layout.addIconSize, weight: .medium))
+                        .foregroundStyle(headerAddButtonIconColor)
+                        .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
+                        .background(
+                            RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
+                                .fill(headerAddButtonBackgroundColor)
+                        )
+                }
+                .buttonStyle(.plain)
+                .scaleEffect(isHeaderQuickAddHovered ? 1.1 : 1.0)
+                .animation(
+                    .spring(
+                        response: Layout.addButtonSpringResponse,
+                        dampingFraction: Layout.addButtonSpringDamping
+                    ),
+                    value: isHeaderQuickAddHovered
+                )
+                .padding(.top, -25)
+                .onHover { hovering in
+                    isHeaderQuickAddHovered = hovering
+                    handleHeaderQuickAddHoverChanged(hovering)
                 }
             }
             .frame(height: Layout.headerHeight, alignment: .top)
@@ -198,76 +194,6 @@ struct ContentView: View {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    private var inputRow: some View {
-        let hasInput = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-
-        return ZStack {
-            inputBackground
-            HStack {
-                ZStack(alignment: .leading) {
-                    if newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(Layout.rotatingPlaceholders[placeholderIndex])
-                            .id(placeholderIndex)
-                            .font(.system(size: Layout.inputFontSize, weight: .regular))
-                            .foregroundStyle(placeholderTextColor)
-                            .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.25), value: placeholderIndex)
-                    }
-
-                    TextField("", text: $newTaskText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: Layout.inputFontSize, weight: .regular))
-                        .foregroundStyle(primaryTextColor)
-                }
-                .padding(.leading, Layout.inputTextLeading)
-                .focused($isInputFocused)
-                .onSubmit(addTask)
-
-                Spacer()
-
-                if hasInput {
-                    Button(action: addTask) {
-                        Image(systemName: "plus")
-                            .font(.system(size: Layout.addIconSize, weight: .medium))
-                            .foregroundStyle(addButtonIconColor)
-                            .frame(width: Layout.addButtonWidth, height: Layout.addButtonHeight)
-                            .background(
-                                RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                    .fill(.thinMaterial)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Layout.addButtonCornerRadius, style: .continuous)
-                                            .fill(addButtonTint)
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Add task")
-                    .scaleEffect(isAddHovered ? 1.1 : 1.0)
-                    .animation(.spring(response: Layout.addButtonSpringResponse, dampingFraction: Layout.addButtonSpringDamping), value: isAddHovered)
-                    .onHover { hovering in
-                        isAddHovered = hovering
-                    }
-                    .padding(.trailing, Layout.addButtonTrailing)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.82, anchor: .center)),
-                        removal: .opacity.combined(with: .scale(scale: 0.94, anchor: .center))
-                    ))
-                }
-            }
-        }
-        .frame(height: Layout.inputHeight)
-        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: hasInput)
-        .onHover { hovering in
-            isInputHovered = hovering
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            activateWindow()
-            isInputFocused = true
-        }
-        .modifier(ShakeEffect(animatableData: shakeTrigger))
     }
 
     private var categorySection: some View {
@@ -548,8 +474,17 @@ struct ContentView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: Layout.listRowSpacing) {
-                ForEach(visibleTasks) { task in
+                ForEach(Array(visibleTasks.enumerated()), id: \.element.id) { index, task in
                     taskRowView(for: task)
+                        .overlay(alignment: .bottom) {
+                            if index < visibleTasks.count - 1 {
+                                Rectangle()
+                                    .fill(taskGhostDividerColor)
+                                    .frame(height: 1)
+                                    .padding(.horizontal, Layout.taskGhostDividerHorizontalInset)
+                                    .offset(y: Layout.taskGhostDividerYOffset)
+                            }
+                        }
                 }
             }
             .padding(.top, Layout.listTopPadding)
@@ -613,20 +548,6 @@ struct ContentView: View {
             }
     }
 
-    private func addTask() {
-        let trimmed = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else {
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.55)) {
-                shakeTrigger += 1
-            }
-            return
-        }
-        store.addTask(title: trimmed, categoryID: selectedCategoryID)
-        newTaskText = ""
-        isInputFocused = true
-        activateWindow()
-    }
-
     private func toggleDoneWithDelay(taskID: UUID) {
         guard let currentTask = store.activeTasks.first(where: { $0.id == taskID }) else { return }
 
@@ -660,11 +581,33 @@ struct ContentView: View {
         windowRef?.isMovableByWindowBackground = !isListHovered
     }
 
-    private func rotatePlaceholderIfNeeded() {
-        guard newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            placeholderIndex = (placeholderIndex + 1) % Layout.rotatingPlaceholders.count
+    private func presentQuickAddOverlay() {
+        NotificationCenter.default.post(name: .stickyToDoPresentQuickAddRequested, object: nil)
+    }
+
+    private func handleHeaderQuickAddHoverChanged(_ hovering: Bool) {
+        cancelHeaderQuickAddTooltipWorkItem()
+
+        guard hovering else {
+            withAnimation(.easeOut(duration: 0.12)) {
+                isHeaderQuickAddTooltipVisible = false
+            }
+            return
         }
+
+        let workItem = DispatchWorkItem {
+            guard isHeaderQuickAddHovered else { return }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHeaderQuickAddTooltipVisible = true
+            }
+        }
+        headerQuickAddTooltipWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+    }
+
+    private func cancelHeaderQuickAddTooltipWorkItem() {
+        headerQuickAddTooltipWorkItem?.cancel()
+        headerQuickAddTooltipWorkItem = nil
     }
 
     private func beginCategoryCreation(for taskID: UUID?) {
@@ -871,26 +814,6 @@ private extension ContentView {
         isDark ? Theme.darkBase : Theme.lightCard
     }
 
-    var inputBackground: some View {
-        let stroke = isDark
-            ? (isInputHovered ? Color.white.opacity(0.10) : Color.white.opacity(0.06))
-            : (isInputHovered ? Theme.textPrimary.opacity(0.12) : Theme.textPrimary.opacity(0.08))
-
-        return RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-            .fill(isDark ? Theme.darkInput : Color.white)
-            .overlay(
-                RoundedRectangle(cornerRadius: Layout.inputCornerRadius, style: .continuous)
-                    .stroke(stroke, lineWidth: 1)
-            )
-            .shadow(
-                color: isDark ? Color.black.opacity(0.12) : Color.black.opacity(0.05),
-                radius: 3,
-                x: 0,
-                y: 1
-            )
-            .animation(.easeInOut(duration: 0.16), value: isInputHovered)
-    }
-
     var windowHeight: CGFloat {
         let listHeight = visibleTasks.isEmpty
             ? Layout.emptyStateBottomSpace
@@ -898,8 +821,6 @@ private extension ContentView {
         let dynamicHeight = Layout.cardTopPadding
             + Layout.headerSectionTopPadding
             + Layout.headerHeight
-            + Layout.inputHeight
-            + Layout.headerToInputSpacing
             + categorySectionHeight
             + listHeight
         return visibleTasks.isEmpty ? dynamicHeight : min(Layout.maxHeight, dynamicHeight)
@@ -995,57 +916,37 @@ private extension ContentView {
     }
 
 
-    var completedCount: Int {
-        store.completedTaskCount
-    }
-
-    var remainingCount: Int {
-        max(0, store.taskCount - completedCount)
-    }
-
-    var counterProgress: CGFloat {
-        guard store.taskCount > 0 else { return 0 }
-        return CGFloat(completedCount) / CGFloat(store.taskCount)
-    }
-
-    var counterTrackColor: Color {
-        isDark ? Color.white.opacity(0.18) : Theme.textPrimary.opacity(0.12)
-    }
-
-    var counterProgressColor: Color {
+    var headerAddButtonBackgroundColor: Color {
         isDark ? .white : Theme.textPrimary
     }
 
-    var addButtonTint: Color {
-        isDark ? .white : Theme.textPrimary
-    }
-
-    var addButtonIconColor: Color {
+    var headerAddButtonIconColor: Color {
         isDark ? Theme.textPrimary : .white
     }
 
-    var counterTooltip: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Completed: \(completedCount)")
-            Text("Remaining: \(remainingCount)")
-        }
-        .font(.system(size: 12, weight: .regular))
-        .foregroundStyle(isDark ? Color.white : Theme.textPrimary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isDark ? Theme.darkBase : Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+    var taskGhostDividerColor: Color {
+        isDark ? Color.white.opacity(0.05) : Theme.textPrimary.opacity(0.06)
+    }
+
+    var quickAddButtonTooltip: some View {
+        Text("Press ⌥⌘N to add a task")
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(isDark ? Color.white : Theme.textPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isDark ? Theme.darkBase : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(
-                            isDark ? Color.white.opacity(0.12) : Theme.textPrimary.opacity(0.08),
-                            lineWidth: 1
-                        )
-                )
-        )
-        .shadow(color: Color.black.opacity(isDark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
-        .fixedSize()
+                                isDark ? Color.white.opacity(0.12) : Theme.textPrimary.opacity(0.08),
+                                lineWidth: 1
+                            )
+                    )
+            )
+            .shadow(color: Color.black.opacity(isDark ? 0.22 : 0.10), radius: 10, x: 0, y: 4)
+            .fixedSize()
     }
 
 }
@@ -1064,35 +965,19 @@ private enum Layout {
     static let headerLineHeight: CGFloat = 24
     static let headerTrailingPadding: CGFloat = 0
     static let headerInnerSpacing: CGFloat = 8
-    static let headerToInputSpacing: CGFloat = 12
-    static let counterSize: CGFloat = 24
-    static let counterLineWidth: CGFloat = 4
-    static let counterHitSize: CGFloat = 36
-    static let counterTooltipTop: CGFloat = 40
-    static let counterTooltipTrailing: CGFloat = 8
 
     static let dayFontSize: CGFloat = 56
     static let monthFontSize: CGFloat = 20
     static let weekdayFontSize: CGFloat = 20
 
-    static let inputHeight: CGFloat = 56
-    static let inputCornerRadius: CGFloat = 100
-    static let inputFontSize: CGFloat = 18
-    static let inputTextLeading: CGFloat = 24
-    static let rotatingPlaceholders: [String] = [
-        "Add today's task",
-        "What do you want to do today?",
-        "What's on your mind?",
-        "Make today count…"
-    ]
-
     static let addButtonWidth: CGFloat = 40
     static let addButtonHeight: CGFloat = 40
     static let addButtonCornerRadius: CGFloat = 20
-    static let addButtonTrailing: CGFloat = 10
     static let addIconSize: CGFloat = 20
     static let addButtonSpringResponse: CGFloat = 0.28
     static let addButtonSpringDamping: CGFloat = 0.7
+    static let quickAddTooltipTop: CGFloat = 40
+    static let quickAddTooltipTrailing: CGFloat = 8
 
     static let inputToCategorySpacing: CGFloat = 12
     static let categoryBarHeight: CGFloat = 30
@@ -1109,13 +994,16 @@ private enum Layout {
     static let listMaxHeight: CGFloat = 600
     static let listTopFadeHeight: CGFloat = 20
     static let listBottomFadeHeight: CGFloat = 20
+    static let taskGhostDividerHorizontalInset: CGFloat = 16
+    static let taskGhostDividerYOffset: CGFloat = 2
     static let doneMoveDelay: TimeInterval = 0.30
     static let emptyStateBottomSpace: CGFloat = 100
 
     static let emptyStateMessage = EmptyStateMessage(
         title: "All clear.",
         line1: "Nothing on your plate today.",
-        line2: "Add something or enjoy the quiet."
+        line2: "Add something or enjoy the quiet.",
+        line3: "Press ⌥⌘N to add a task."
     )
 }
 
@@ -1123,4 +1011,5 @@ private struct EmptyStateMessage {
     let title: String
     let line1: String
     let line2: String
+    let line3: String
 }

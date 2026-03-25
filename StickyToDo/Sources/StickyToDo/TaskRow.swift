@@ -156,10 +156,10 @@ struct TaskRow: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .frame(height: 48)
-        .contentShape(RoundedRectangle(cornerRadius: 100, style: .continuous))
+        .contentShape(Rectangle())
         .background(
-            RoundedRectangle(cornerRadius: 100, style: .continuous)
-                .fill((isRowHovered || isDragging) ? rowHoverColor : .clear)
+            Rectangle()
+                .fill(isDragging ? rowHoverColor : .clear)
         )
         .overlay(alignment: .topLeading) {
             if showTitleTooltip && isEditing == false && isTitleTruncated {
@@ -211,10 +211,11 @@ struct TaskRow: View {
     }
 
     private var taskTitleColor: Color {
-        if task.isDone {
-            return completedTextColor
+        let baseColor = task.isDone ? completedTextColor : textPrimaryColor
+        guard isRowHovered, isDragging == false, isEditing == false else {
+            return baseColor
         }
-        return textPrimaryColor
+        return baseColor.opacity(0.6)
     }
 
     private var taskFontSize: CGFloat {
