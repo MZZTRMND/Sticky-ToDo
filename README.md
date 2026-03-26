@@ -40,6 +40,3 @@ StickyToDo/
 - Tasks and categories are stored locally on your Mac.
 - The app is currently set up as a macOS app, not an iPhone or iPad app.
 
-## License
-
-Add your preferred license here if you plan to open-source the project.
